@@ -166,6 +166,88 @@ const probeSource = (emulatedWidth) => `(() => {
   });
 })()`;
 
+/* Spec line 4: "the visitor does something that changes what they see."
+   spec/assignment-1.test.ts asserts the control exists and is reachable; only a
+   real browser can answer whether operating it changes anything.
+
+   The keys go through Input.dispatchKeyEvent, NOT an in-page
+   `dispatchEvent(new KeyboardEvent(...))`. Synthetic events have
+   isTrusted: false, so the browser performs no default action: a perfectly
+   good <button> is never activated by Enter and the check reported NO CHANGE on
+   a control that worked fine by hand. That false negative would have argued for
+   adding a keydown handler to a button that never needed one. CDP-injected keys
+   are trusted, so native activation and native range-stepping both just work.
+
+   Operated by keyboard rather than by .click() on purpose -- the marker tabs
+   through it, and a mouse-only control passes a click test while still failing
+   the artefact band. */
+const KEYS = [
+  { key: "Enter", code: "Enter", vk: 13, text: "\r" },
+  { key: " ", code: "Space", vk: 32, text: " " },
+  { key: "ArrowRight", code: "ArrowRight", vk: 39 },
+  { key: "ArrowUp", code: "ArrowUp", vk: 38 },
+];
+
+const readOutput = `(() => {
+  const control = document.querySelector("[data-core-interaction]");
+  const output = document.querySelector("[data-core-output]");
+  if (!control || !output) return JSON.stringify({ present: false });
+  return JSON.stringify({
+    present: true,
+    focused: document.activeElement === control || control.contains(document.activeElement),
+    state: output.innerHTML + "|" + output.textContent.trim()
+      + "|" + JSON.stringify(getComputedStyle(output).transform),
+  });
+})()`;
+
+async function evaluate(client, sessionId, expression) {
+  const { result } = await client.send(
+    "Runtime.evaluate",
+    { expression, returnByValue: true, awaitPromise: true },
+    sessionId,
+  );
+  return JSON.parse(result.value);
+}
+
+async function probeInteraction(client, sessionId) {
+  await evaluate(
+    client,
+    sessionId,
+    `(() => { document.querySelector("[data-core-interaction]")?.focus(); return "null"; })()`,
+  );
+  const before = await evaluate(client, sessionId, readOutput);
+  if (!before.present) return { present: false };
+
+  for (const { key, code, vk, text } of KEYS) {
+    await client.send(
+      "Input.dispatchKeyEvent",
+      {
+        type: text ? "keyDown" : "rawKeyDown",
+        key,
+        code,
+        windowsVirtualKeyCode: vk,
+        nativeVirtualKeyCode: vk,
+        ...(text ? { text } : {}),
+      },
+      sessionId,
+    );
+    await client.send(
+      "Input.dispatchKeyEvent",
+      { type: "keyUp", key, code, windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk },
+      sessionId,
+    );
+    await sleep(150);
+  }
+  await sleep(300);
+
+  const after = await evaluate(client, sessionId, readOutput);
+  return {
+    present: true,
+    focused: before.focused,
+    changed: before.state !== after.state,
+  };
+}
+
 const BASE = await readBase();
 const PAGES = await discoverPages();
 
@@ -184,6 +266,8 @@ const preview = spawn(
 
 let chrome;
 let failures = 0;
+let interactionPages = 0;
+let interactionWorking = 0;
 
 try {
   await waitForServer(`${ORIGIN}${BASE}/`);
@@ -280,13 +364,41 @@ try {
         sessionId,
       );
 
-      const ok = probe.overflow === 0 && probe.h1 === 1 && hidden.value === 0;
+      // Spec line 4: "the visitor does something that changes what they see."
+      // spec/assignment-1.test.ts asserts the control exists and is reachable;
+      // only a real browser can answer whether operating it changes anything.
+      // Acted on by keyboard, not by .click(), because the marker tabs through
+      // it -- a mouse-only control passes a click test and still fails the
+      // artefact band.
+      const core = await probeInteraction(client, sessionId);
+
+      // A page without the marked control isn't a failure -- an explainer may
+      // have an about page. A *site* without one is, so that's asserted once at
+      // the end rather than per page.
+      if (core.present) {
+        interactionPages += 1;
+        if (core.focused && core.changed) interactionWorking += 1;
+      }
+
+      const ok =
+        probe.overflow === 0 &&
+        probe.h1 === 1 &&
+        hidden.value === 0 &&
+        (!core.present || (core.focused && core.changed));
       if (!ok) failures += 1;
+      const coreStatus = !core.present
+        ? "n/a"
+        : !core.focused
+          ? "not focusable"
+          : core.changed
+            ? "changes"
+            : "NO CHANGE";
       console.log(
         `  ${ok ? "ok  " : "FAIL"} ${page.name.padEnd(11)} ` +
           `doc ${String(probe.docWidth).padStart(5)}px  ` +
           `overflow ${String(probe.overflow).padStart(4)}px  ` +
-          `h1 ${probe.h1}  unrevealed ${hidden.value}  height ${probe.height}px`,
+          `h1 ${probe.h1}  unrevealed ${hidden.value}  ` +
+          `interaction ${coreStatus.padEnd(13)} height ${probe.height}px`,
       );
       // Only when the document itself overflows. An element wider than the
       // viewport inside an `overflow: hidden` ancestor is a full-bleed
@@ -340,8 +452,21 @@ try {
   preview.kill();
 }
 
+// Spec line 4 is a claim about the site, not about any one page.
+if (interactionWorking === 0) {
+  failures += 1;
+  console.error(
+    interactionPages === 0
+      ? "\nNo [data-core-interaction] anywhere in the built site. Spec line 4 " +
+          "asks that the visitor does something that changes what they see — " +
+          "mark the control and the region it changes."
+      : "\n[data-core-interaction] found, but operating it by keyboard changed " +
+          "nothing in [data-core-output] on any page or viewport.",
+  );
+}
+
 if (failures > 0) {
-  console.error(`\n${failures} viewport/page combination(s) failed.`);
+  console.error(`\n${failures} check(s) failed.`);
   process.exit(1);
 }
-console.log("\nAll pages fit both marked viewports.");
+console.log("\nAll pages fit both marked viewports, and the core interaction responds.");

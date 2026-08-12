@@ -238,6 +238,41 @@ Three things this cost, which are worth remembering when reading any sensor:
   now starts and stops its own, because "remember to boot a server first" is a
   silent-failure mode, not an instruction.
 
+## The core interaction is marked in the markup
+
+The spec asks that "the visitor does something that changes what they see" and
+that I "state the core interaction plainly enough to write a test for it". That
+statement is a convention, not a paragraph:
+
+- the control the visitor acts on carries **`data-core-interaction`**
+- the region that changes as a result carries **`data-core-output`** (exactly
+  one — several controls driving one output is fine, two outputs is usually two
+  ideas, and the spec allows one)
+
+`spec/assignment-1.test.ts` asserts the structure: the control exists, is
+keyboard-focusable, and has an accessible name. `pnpm check:render` asserts the
+behaviour, by operating it with real keys and checking `[data-core-output]`
+actually changed. Between them the spec's central line is mechanically checked
+without either test knowing what the idea is, which is what lets the idea change
+without the tests needing to.
+
+**Build the control as a real element** — `button`, `input`, `select`,
+`details` — rather than a `div` with a click handler. The artefact HD band is
+"holds up under use it wasn't designed for: the keyboard, a resize
+mid-interaction, a slow connection", and a `div` fails on the marker's first Tab
+press. Both sensors reject one.
+
+A note on testing keyboard input, because it cost an hour: an in-page
+`dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }))` does **not**
+activate a native control. Synthetic events have `isTrusted: false`, so the
+browser performs no default action, and the first version of the interaction
+check reported `NO CHANGE` against a `<button>` that worked perfectly by hand.
+It would have argued for adding a `keydown` handler to a button that never
+needed one. `check:render` uses CDP's `Input.dispatchKeyEvent`, which is
+trusted. **If a sensor says the page is broken, reproduce it by hand before
+changing the page** — last week the same shape of error was a cropped
+screenshot.
+
 ## Never make content visibility depend on JavaScript
 
 If content is hidden by default and revealed by script, the reveal is a race and
