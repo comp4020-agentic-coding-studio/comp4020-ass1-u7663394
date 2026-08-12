@@ -1,8 +1,13 @@
 # COMP4020 prototype
 
-This is your starter repo for a COMP4020 prototype: a static site written in
-HTML/CSS/TypeScript that builds to plain HTML/CSS/JS and deploys to GitHub
-Pages. The **deployed site is what gets marked** --- not this repo, and not "it
+This is your starter repo for a COMP4020 prototype. **This week's stack is
+Astro**, the course default from C2 onward: pages live in `src/pages/` as
+`.astro` files, layouts in `src/layouts/`, styles in `src/styles/`, and
+`pnpm build` (`astro build`) emits the built site into `dist/`. The template's
+own Vite/plain-HTML default was swapped out — there's no root-level
+`index.html` or `main.ts` any more; a new page is a new file under
+`src/pages/`. Deploys to GitHub Pages. The
+**deployed site is what gets marked** --- not this repo, and not "it
 works on my machine". It's marked live in Chrome against the deployed URL at two
 viewports --- 1920×1080 (desktop) and 390×844 (phone) --- and both count in
 full, so make that artefact good at both and use the checks below to know
@@ -21,9 +26,14 @@ and see `spec/README.md` for how the checks in this repo relate to it.
 - Before you push, run `pnpm check`. It runs most of what CI runs --- build,
   lint, and the spec --- so you catch those in seconds instead of waiting for
   the pipeline. The links check, the evidence check, the secrets scan, and the
-  deploy itself only run in CI; run `pnpm dlx linkinator ./dist --silent`
-  locally against a fresh `pnpm build` for the links check without waiting for
-  CI.
+  deploy itself only run in CI. To run the links check locally you have to
+  reproduce what CI now does --- serve the built site *under the base path* and
+  crawl that URL, not `linkinator ./dist`:
+
+  ```sh
+  pnpm build && pnpm preview --port 4989 &
+  pnpm dlx linkinator "http://localhost:4989/comp4020-ass1-u7663394/" --recurse --silent
+  ```
 - To see what the page actually looks like rather than what you assume it looks
   like, open it in a browser (the `agent-browser` CLI, documented on
   [the course site](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/topics/backpressure/#agent-browser-the-rendered-page-as-ground-truth),
@@ -52,10 +62,10 @@ They also carry a mark at a crit: the sweep runs fifteen minutes after your
 cutoff, and green checks there are worth half that week's shipped mark. Still
 running counts as not green, so ship with time for CI to finish.
 
-- **typecheck** --- `tsc --noEmit` runs first in `pnpm check`, so a type error
-  stops the roster before the build even starts. The types are extra
-  backpressure: a red here is the compiler telling you a claim in the code is
-  false.
+- **typecheck** --- `astro check` runs first in `pnpm check` (it type-checks
+  both `.astro` files and plain `.ts`), so a type error stops the roster before
+  the build even starts. The types are extra backpressure: a red here is the
+  compiler telling you a claim in the code is false.
 - **build** --- the site must build (`pnpm build`). A build failure means the
   deployed site is broken or stale, so nothing else matters until this is green.
 - **deploy / online** --- the live GitHub Pages URL must load and return the
@@ -65,8 +75,10 @@ running counts as not green, so ship with time for CI to finish.
   website, whatever the week's brief asks; the tests you write for the week's
   own spec run alongside it (any `spec/*.test.ts`). A failure names the contract
   you haven't met yet.
-- **lint** --- `stylelint` for CSS, `oxlint` for TypeScript. Flags code that's
-  wrong, fragile, or non-idiomatic. Read the rule it names.
+- **lint** --- `stylelint` for CSS, `oxlint` for TypeScript (`.astro` files
+  aren't linted by either --- `astro check` above is what catches problems in
+  them). Flags code that's wrong, fragile, or non-idiomatic. Read the rule it
+  names.
 - **tests** --- any other tests you write, wherever you put them (co-located
   with your source is fine, not just `spec/`), must pass. Vitest picks up both
   this and the spec suite in one `vitest run`, the last step of `pnpm check`. A
@@ -82,7 +94,11 @@ running counts as not green, so ship with time for CI to finish.
   [assessment page](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/topics/assessment/#what-you-submit)
   for what counts as evidence.
 - **links** --- internal links must resolve. A broken link is a dead end you
-  didn't mean to ship.
+  didn't mean to ship. CI boots `astro preview` and crawls the site **under the
+  base path** (`/comp4020-ass1-u7663394/`), so this sensor now sees the same
+  URLs a visitor does. That's a change from the template's old
+  `linkinator ./dist`, which served `dist` as a root and so disagreed with the
+  deployed site about what a root-absolute link means.
 - **secrets** --- the repo is scanned for committed credentials. Never put a
   key, token, or password in a tracked file. If one leaks, rotate it. A local
   pre-commit hook (`.githooks/pre-commit`, installed by `pnpm install`) also
@@ -97,22 +113,33 @@ CI machine, not proof the site is fast for real users.
 
 ## The stack is swappable
 
-Out of the box this is plain HTML/CSS/TypeScript on Vite, and every `.html` file
-in the repo is a page: add pages, link them, and the build picks them up with no
-config. That's a default, not a rule (unless the week's spec says otherwise).
-You can swap in Astro or any other static generator, because nothing in CI names
-a tool --- the whole contract is:
+This week is Astro: every `.astro` (or `.md`) file under `src/pages/` is a
+page, and the build picks it up with no config. That's this week's choice, not
+a rule (unless the week's spec says otherwise) --- a future week can swap in
+plain Vite, a different generator, or hand-written HTML, because nothing in CI
+names a tool. The whole contract is:
 
 - `pnpm build` emits the complete site into `dist/`
 - the `package.json` scripts (`check`, `check:evidence`, `build`) keep working
 - whatever lands in `dist/` still passes the invariants in `spec/`
 
 Two things bite in a swap. The deployed site lives under a path
-(`…github.io/<repo>/`), so configure your generator's base path --- this
-template's Vite config uses relative asset URLs to sidestep that, but most
-generators (Astro included) need `base` set explicitly, and getting it wrong
-looks fine locally while every asset 404s on the live URL. And commit the
-updated `pnpm-lock.yaml`: CI installs with `--frozen-lockfile`.
+(`…github.io/<repo>/`), so Astro needs `base` set explicitly in
+`astro.config.ts` --- already done, to this repo's name, by the stack skill,
+which derives it from the origin remote rather than trusting anyone to type it.
+Getting `base` wrong looks fine locally while every asset 404s on the live URL.
+The config also sets `build.format: "file"` (so `page.astro` builds to
+`dist/page.html` and hand-written *relative* links keep working) and
+`compressHTML: true`. And commit the updated `pnpm-lock.yaml`: CI installs with
+`--frozen-lockfile`.
+
+`pnpm dev` serves under the base path too, deliberately: a path bug reproduces
+on localhost instead of only on the live URL. So the dev URL is
+`http://localhost:4321/comp4020-ass1-u7663394/`, and the bare root correctly
+404s. If 4321 is already taken --- by a dev server left running in another
+course repo --- Astro silently picks the next free port. Read the port out of
+its startup line rather than assuming; checking the wrong port once already
+produced a "broken base path" that did not exist.
 
 ## Your process is part of the mark
 
@@ -160,3 +187,122 @@ catching you out, a fact about the stack the agent keeps getting wrong --- write
 it down here. Growing this file is the work of harness engineering, and the gap
 between this boilerplate and your own version is part of what your prototype
 says about the developer you're becoming.
+
+---
+
+# This prototype: an interactive explainer (A1)
+
+> **Not yet decided.** The brief asks for an interactive explainer of something
+> more people should know or understand: one strong idea, one dataset or
+> mechanic, and nothing else. Replace this block with what the thing *is* and
+> what the visitor *does* — in one paragraph — as soon as that's settled, and
+> state the core interaction plainly enough that `spec/assignment-1.test.ts` can
+> assert it.
+
+The rules below are not style preferences. Each one is here because something
+went wrong, and the note says what. They were earned in C1 and C2 and carried
+forward; the ones that only made sense against last week's prototype have been
+cut, and the ones that were about a specific page have been rewritten as the
+rule underneath.
+
+## The rendered page is the sensor, not the source
+
+`pnpm check` proves the HTML is well-formed. It has no layout engine — Vitest
+runs against JSDOM, which has none at all — so it cannot see a page that
+overflows a phone or a section that never becomes visible. **`pnpm check:render`
+before committing anything visual.** It builds, serves the site under its base
+path, and drives real Chrome over the DevTools Protocol at both marked
+viewports (1920×1080 and 390×844), failing on horizontal overflow, on a missing
+or duplicated `h1`, and on `[data-reveal]` content still transparent at the
+bottom of the page. `pnpm shots` writes full-page screenshots to `.shots/` —
+**look at them.**
+
+It discovers its own page list from `dist/`, so a page you add is checked
+without touching the script. It is not wired into `pnpm check`: it needs Chrome
+and a few seconds, and the fast loop should stay fast.
+
+Three things this cost, which are worth remembering when reading any sensor:
+
+- A naive `chrome --headless --screenshot --window-size=390,844` cropped a
+  desktop-width render and looked exactly like a broken mobile layout. Half an
+  hour went into a bug that did not exist. If a measurement disagrees with a
+  screenshot, trust the measurement and check the screenshot's method.
+- `check:render` first compared overflow against `window.innerWidth`, which
+  widens along with an overflowing grid track and so reported zero overflow on
+  a page 46px too wide. **A sensor that derives its threshold from the thing
+  it's measuring cannot fail.** It compares against the requested viewport now.
+  Note the boundary: deriving the *page list* from `dist/` is fine, because
+  that's an inventory. Deriving the *threshold* from the measurement is not.
+- A sensor pointed at the wrong server measures nothing and reports success at
+  it. The old version assumed a preview server was already running on 4321; it
+  now starts and stops its own, because "remember to boot a server first" is a
+  silent-failure mode, not an instruction.
+
+## Never make content visibility depend on JavaScript
+
+If content is hidden by default and revealed by script, the reveal is a race and
+the failure is invisible. `IntersectionObserver` only reports a *change* in
+intersection, so an element that crosses the viewport between two deliveries —
+a flick-scroll, an End keypress, a jump to an anchor — is never reported and
+stays at `opacity: 0` permanently, with no error anywhere. Measured last week: 4
+of 19 elements revealed at a 40ms scroll step, 19 of 19 at 120ms. A scroll
+handler lost the same race.
+
+Reveals go in CSS (`animation-timeline: view()`). If one ever needs to move back
+into JavaScript, the hidden state must be gated behind something JavaScript has
+already set, and the text must still be in the served HTML — assert that in
+`spec/assignment-1.test.ts`.
+
+This matters more this week, not less: an explainer where the visitor scrolls or
+drags *is* the genre, so the reveal path is on the critical path to the mark.
+
+## If the explainer carries data, the data has to be honest
+
+Both of these were earned against a corporate site that printed
+`9.3 million merchants` with no date — the number was from Q3 2022, and fixing
+that was the point of the redesign. They apply here only if the explainer shows
+figures, which most explainers do. If it turns out to be a pure mechanic with no
+dataset, these two are dead weight and can go.
+
+- **Every figure carries its source and period.** Keep them in a data module
+  with the rule stated at the top of the file: if a number can't be sourced, it
+  doesn't go in. An explainer's whole claim on a reader's attention is that it's
+  telling them something true.
+- **Never animate the value of a figure.** A count-up left `396` on screen where
+  the source said `687`, and `3.03` for `5.27`, whenever `requestAnimationFrame`
+  stopped early. Showing a false number for a second — or leaving one there — is
+  not a trade worth making. Motion goes on containers, never on the digits.
+  Watch for this one: a number ticking up is a stock explainer flourish, so it's
+  exactly the thing that gets suggested.
+
+## URLs: relative in the built output, never root-absolute
+
+The site deploys under `…github.io/<repo>/`, so a root-absolute `/about/` is
+correct only when served at exactly that prefix. Last week root-absolute links
+put 13 broken links in front of CI and would have blocked the deploy, since
+`deploy` needs `check`.
+
+The mechanism is different this week, so don't carry last week's fix: there's no
+`relative-urls` build integration and no `src/lib/url.ts` here. Instead
+`build.format: "file"` means a plain relative `href` resolves correctly both
+locally and deployed. So: **author internal links relative** (`./`, `../x/`), or
+prefix `import.meta.env.BASE_URL`. Never root-absolute. Assert it in
+`spec/assignment-1.test.ts` by resolving every internal link against `dist` —
+the same thing CI's crawl does, in milliseconds instead of a pipeline run.
+
+## Layout rules that bit
+
+- `repeat(auto-fit, minmax(26rem, 1fr))` **cannot shrink below 26rem**, so it
+  overflowed a 390px phone. Always
+  `repeat(auto-fit, minmax(min(<size>, 100%), 1fr))`.
+- A `position: fixed` header takes no flow height, so the first section slides
+  under it. Give the offset back in one place and keep the number in a single
+  custom property (`--header-h`) rather than repeating it — two copies drift.
+- Format dates with an explicit `en-AU` locale. A bare `toLocaleDateString()`
+  renders differently on my machine and on the runner.
+
+## Images and assets: served from this repo, never hotlinked
+
+Downscale into `public/` and serve from here. A third-party CDN can block by
+referrer or simply move, and an asset that 404s on the deployed URL counts as
+broken even though it loaded locally. Assert no `<img>` has an `http(s)` src.

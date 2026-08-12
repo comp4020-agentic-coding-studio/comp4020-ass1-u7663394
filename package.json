@@ -10,6 +10,8 @@
     "typecheck": "astro check",
     "check": "pnpm typecheck && pnpm build && oxlint --ignore-path .gitignore && stylelint \"**/*.css\" --ignore-path .gitignore --allow-empty-input && vitest run",
     "check:evidence": "node scripts/check-evidence.ts",
+    "check:render": "pnpm build && node scripts/render-check.mjs",
+    "shots": "pnpm build && node scripts/render-check.mjs --shots .shots",
     "test": "vitest run"
   },
   "devDependencies": {
