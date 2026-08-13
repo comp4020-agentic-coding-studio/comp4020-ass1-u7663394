@@ -241,7 +241,7 @@ or duplicated `h1`, and on `[data-reveal]` content still transparent at the
 bottom of the page. `pnpm shots` writes full-page screenshots to `.shots/` —
 **look at them.** It uses reduced motion to make every overview deterministic;
 `pnpm shots:inspection` additionally waits for and captures the close camera
-pass at 100,000 and 1,000,000.
+pass at every stage from 100 through 1,000,000.
 
 It discovers its own page list from `dist/`, so a page you add is checked
 without touching the script. It is not wired into `pnpm check`: it needs Chrome
@@ -337,10 +337,10 @@ quantity derived from a thing must not also determine that thing.
   is two passes: every old point, then a deterministic sample of the nine
   arriving copies, with the exact million drawn once on settle. Visual
   continuity is part of correctness, not polish to trade for a benchmark.
-- **A dense quantity needs an overview and an inspection, not one compromise
-  view.** Fitting every point made 100,000 and 1,000,000 technically complete
-  but visually unreadable; zooming in permanently would lose their extent.
-  These states now hold the exact overview, travel closer slowly, then return.
+- **A spatial quantity needs an overview and an inspection, not one compromise
+  view.** From 100 onward, each state holds its exact overview, travels closer,
+  then returns. Profiles follow the geometry: the plane glides obliquely, the
+  cube orbits through its depth, and the row travels among repeated volumes.
   Reduced motion stays at the overview. `src/lib/inspection.test.ts` holds the
   timing edges, and `pnpm shots:inspection` makes both views reviewable.
 - **Reveal hierarchy with light, never geometry.** At dense scales every point
@@ -353,14 +353,10 @@ quantity derived from a thing must not also determine that thing.
   behind them, so fully populated cubes looked hollow. Dense states keep normal
   alpha blending and depth comparison but disable depth writes. Interior,
   face, and edge weights stay explicit and tested in `src/lib/layout.test.ts`.
-- **Dense stages may need different interior ink.** The shallower 100,000-point
-  plane needs stronger interior opacity than the million-point volume to make
-  each cube feel filled. The million keeps its established weight, and the
-  transition interpolates between them; geometry and point size never change.
-- **An overview is a beat, not a pause.** The dense states hold their complete
-  overview for 500ms before travelling closer. That is enough to register the
-  extent without losing momentum. Reduced motion remains at the overview, and
-  the return leg is unchanged.
+- **An overview is a beat, not a pause.** Profiles hold their complete view for
+  500–700ms before travelling closer. That is enough to register the extent
+  without losing momentum. Portrait framing may crop further into long forms;
+  the geometry, point size, and reduced-motion overview never change.
 
 ## The core interaction is marked in the markup
 

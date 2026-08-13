@@ -49,24 +49,18 @@ sampling may reduce future detail; it may not erase the past
 
 ### One camera view could not show extent and detail
 
-At 100,000 and 1,000,000, additive points collapsed into interference patterns.
-A permanent close-up made individual blocks clear but concealed the total size;
-the fitted overview did the opposite. I separated those jobs. Each dense state
-now holds a complete overview, travels into the lattice, then returns. Every
-point stays fixed, while the faces and edges of each 1,000-point volume carry
-the structure. A later review found those blocks looked hollow: translucent
-front points were writing depth like an opaque shell and hiding every interior
-layer. Disabling dense-state depth writes and restoring a clear interior weight
-made the full quantity visible without losing the gaps. The shallower 100,000
-plane still needed more interior ink, so it now uses a stronger weight while
-the million remains unchanged; the transition interpolates between them. The
-overview holds for 500ms rather than 1.8 seconds, preserving momentum. The
-million overview remains exact and its close view keeps the stable `50×50×50`
-sample. `pnpm shots:inspection` captures both views at both marked sizes
-([`ec6d17d..1c04a72`](https://github.com/comp4020-agentic-coding-studio/comp4020-ass1-u7663394/compare/ec6d17d..1c04a72)).
+An overview proves the quantity but can hide its internal organisation; a
+permanent close-up does the reverse. I separated those jobs. From 100 onward,
+each state holds its complete view, travels closer, then returns. The path now
+follows the geometry: a shallow glide reveals the plane, an orbit exposes the
+cube, and a deeper pass resolves the row into repeated volumes. Portrait views
+crop further into long forms instead of leaving them as distant ribbons.
+The dense stages retain their accepted paths and million-point sampling.
+`pnpm shots:inspection` captures every close state at both marked sizes
+([`ec6d17d..1fdc8d2`](https://github.com/comp4020-agentic-coding-studio/comp4020-ass1-u7663394/compare/ec6d17d..1fdc8d2)).
 
 ## Where to look
 
 `src/lib/layout.ts` is the spatial argument, `src/lib/inspection.ts` is the
-dense-state camera path, `src/scripts/lattice-renderer.ts` is the WebGL
+structure-specific camera path, `src/scripts/lattice-renderer.ts` is the WebGL
 implementation, and `CLAUDE.md` records the rules this iteration earned.
