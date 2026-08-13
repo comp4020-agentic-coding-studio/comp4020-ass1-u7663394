@@ -75,20 +75,13 @@ const NAMES = [
 ] as const;
 
 const NOTES = [
-  "One dot. Look at how big it is, because it will not change again — " +
-    "everything after this is more of exactly this.",
-  "Ten. You did not really count these. You saw them and knew. " +
-    "That is the last time that happens.",
-  "One hundred. You could still count these, one by one, if someone made you. " +
-    "Nobody is going to make you.",
-  "One thousand. Ten of the block you were just looking at. " +
-    "Counting stopped being an option somewhere in the last second.",
-  "Ten thousand. You are no longer reading a quantity. " +
-    "You are reading a texture and calling it a quantity.",
-  "One hundred thousand. The first dot is still there, in the top-left corner, " +
-    "still exactly the size it was. It is the marked one.",
-  "One million. Four syllables. You read it faster than you read “ten thousand”, " +
-    "and you are looking at a hundred times more of it.",
+  "One dot. This is its size, and it will not change again.",
+  "Ten. You saw that without counting. That stops here.",
+  "One hundred. Countable, if someone made you. Nobody will.",
+  "One thousand. Ten of the block you were just looking at.",
+  "Ten thousand. You are reading texture now, not quantity.",
+  "One hundred thousand. The first dot is still there, marked.",
+  "One million. Four syllables. A hundred of the last screen.",
 ] as const;
 
 export const MAGNITUDES: readonly Magnitude[] = NAMES.map((name, step) => {

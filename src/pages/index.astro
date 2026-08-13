@@ -7,52 +7,38 @@ import { MAGNITUDES } from "../lib/magnitudes";
   title="How big is a million? — an interactive explainer"
   description="One dot is one. Multiply it by ten, seven times. The dot never changes size — only how far back you are standing."
 >
-  <a class="skip" href="#stage">Skip to the explainer</a>
+  <a class="skip" href="#scale">Skip to the scale</a>
 
-  <header class="masthead wrap">
-    <nav aria-label="Primary">
-      <a href="./" class="masthead-home">How big is a million?</a>
-      <a href="#notes">About these numbers</a>
-    </nav>
-  </header>
-
-  <main class="wrap">
-    <section class="intro">
+  {/*
+    One screen. The drawing is the page; everything else is four short lines and
+    a control, laid over it. Without script this whole thing is a plain
+    document: the frame keeps a modest height, and the readout below it is a
+    readable list of all seven magnitudes rather than an empty box.
+  */}
+  <div class="hero">
+    <header class="masthead" data-overlay>
       <h1>How big is a million?</h1>
-      <p class="lede">Large numbers are easy to read and hard to feel.</p>
-      <p class="sub">
-        One dot is one. Multiply by ten, seven times. The dot never changes
-        size — the only thing that moves is how far back you are standing.
-      </p>
-    </section>
+      <nav aria-label="Primary">
+        <a href="#about">Notes</a>
+      </nav>
+    </header>
 
-    <div class="explainer">
-      <figure class="stage" id="stage" data-core-output>
-        <div class="stage-frame" data-frame>
-          <canvas
-            class="stage-canvas"
-            data-canvas
-            role="img"
-            aria-label={MAGNITUDES[0].aria}></canvas>
-          <noscript>
-            {/* The canvas is supported but never painted when script is off,
-                so it is a blank box with nothing to say for itself. The seven
-                magnitudes below are all still there. */}
-            <p class="stage-noscript">
-              The drawing needs JavaScript. Every magnitude it would have drawn
-              is written out below.
-            </p>
-          </noscript>
-        </div>
+    <figure class="stage" data-core-output>
+      <div class="stage-frame" data-frame>
+        <canvas
+          class="stage-canvas"
+          data-canvas
+          role="img"
+          aria-label={MAGNITUDES[0].aria}></canvas>
+        <noscript>
+          <p class="stage-noscript">
+            The drawing needs JavaScript. Every magnitude it would have drawn is
+            written out below.
+          </p>
+        </noscript>
+      </div>
 
-        <figcaption class="stage-caption">
-          {/*
-            All seven magnitudes ship in the HTML. Script marks the page
-            data-js="on", and only then does the CSS collapse the inactive ones
-            — so without JavaScript this is a readable list of every magnitude
-            rather than a blank screen. See CLAUDE.md: content visibility never
-            depends on script.
-          */}
+      <figcaption class="readout" data-overlay>
         <ol class="magnitudes" aria-live="polite">
           {
             MAGNITUDES.map((magnitude) => (
@@ -63,127 +49,117 @@ import { MAGNITUDES } from "../lib/magnitudes";
                 </p>
                 <p class="magnitude-note">{magnitude.note}</p>
                 <p class="magnitude-counting">
-                  Counted aloud, one per second, without stopping:
-                  <strong>{magnitude.counting}</strong>.
+                  {magnitude.counting} to count aloud
                 </p>
               </li>
             ))
           }
         </ol>
-        <p class="magnitude-measure" data-measure></p>
+        <p class="readout-measure" data-measure></p>
       </figcaption>
     </figure>
 
-    <div class="controls">
+    <div class="dock" id="scale" data-overlay>
       {/*
-        The slider is first among the controls on purpose. It steps
-        natively on the arrow keys from step 0, so the keyboard is served
-        by a real control rather than by handlers of mine — and check:render,
-        which focuses the first [data-core-interaction] and sends real key
-        events, exercises that same path.
+        The slider is first in the DOM, and laid out first, so DOM order, visual
+        order and tab order all agree. Being first matters: it steps natively on
+        the arrow keys from step 0, so the keyboard is served by a real control
+        rather than by handlers of mine — and check:render, which focuses the
+        first [data-core-interaction] and sends real key events, exercises that
+        same path. A disabled "back" button first would sit at the start of the
+        scale doing nothing, and the sensor would report a break that isn't one.
       */}
-        <div class="controls-scale">
-          <label class="controls-label" for="magnitude-scale">
-            Magnitude
-          </label>
-          <input
-            id="magnitude-scale"
-            class="controls-slider"
-            type="range"
-            min="0"
-            max="6"
-            step="1"
-            value="0"
-            list="magnitude-ticks"
-            aria-describedby="controls-hint"
-            aria-valuetext="1, one"
-            data-core-interaction
-            data-scale
-          />
-          <datalist id="magnitude-ticks">
-            {
-              MAGNITUDES.map((magnitude) => (
-                <option value={magnitude.step} label={magnitude.numeral} />
-              ))
-            }
-          </datalist>
-          <ul class="controls-marks" aria-hidden="true">
-            <li>1</li>
-            <li>10</li>
-            <li>100</li>
-            <li>1K</li>
-            <li>10K</li>
-            <li>100K</li>
-            <li>1M</li>
-          </ul>
-        </div>
+      <label class="sr-only" for="magnitude-scale">Magnitude</label>
+      <input
+        id="magnitude-scale"
+        class="dock-slider"
+        type="range"
+        min="0"
+        max="6"
+        step="1"
+        value="0"
+        list="magnitude-ticks"
+        aria-describedby="dock-hint"
+        aria-valuetext="1, one"
+        data-core-interaction
+        data-scale
+      />
+      <datalist id="magnitude-ticks">
+        {
+          MAGNITUDES.map((magnitude) => (
+            <option value={magnitude.step} label={magnitude.numeral} />
+          ))
+        }
+      </datalist>
+      <ul class="dock-marks" aria-hidden="true">
+        <li>1</li>
+        <li>10</li>
+        <li>100</li>
+        <li>1K</li>
+        <li>10K</li>
+        <li>100K</li>
+        <li>1M</li>
+      </ul>
 
-        <div class="controls-steps">
+      <div class="dock-row">
+        <p class="dock-hint" id="dock-hint">
+          Drag, or press <kbd>←</kbd> <kbd>→</kbd> anywhere
+        </p>
+        <div class="dock-nudges">
           <button
             type="button"
-            class="button"
+            class="nudge"
+            aria-label="Ten times fewer"
             data-core-interaction
             data-back
             disabled
           >
-            <span aria-hidden="true">÷10</span>
-            <span><span class="sr-only">Ten times </span>fewer</span>
+            <span aria-hidden="true">←</span>
           </button>
-          <button type="button" class="button" data-core-interaction data-next>
-            <span aria-hidden="true">×10</span>
-            <span><span class="sr-only">Ten times </span>more</span>
+          <button
+            type="button"
+            class="nudge"
+            aria-label="Ten times more"
+            data-core-interaction
+            data-next
+          >
+            <span aria-hidden="true">→</span>
           </button>
         </div>
-
-        <p class="controls-hint" id="controls-hint">
-          Drag the scale, press the buttons, or use <kbd>←</kbd> and
-          <kbd>→</kbd> anywhere on the page.
-        </p>
       </div>
-
-      <p class="payoff" data-payoff>
-        Every dot on that screen is the one you started with, at the same size.
-        You have already looked at all of them, one hundred at a time. You just
-        cannot find the first one any more — and that is the whole difference
-        between reading <em>a million</em> and meaning it.
-      </p>
     </div>
 
-    <section class="notes" id="notes">
-      <h2>About these numbers</h2>
-      <ul>
-        <li>
-          There is no dataset here. The only data is the powers of ten, and the
-          drawing contains exactly as many dots as the number says.
-        </li>
-        <li>
-          <strong>Counting time</strong> is arithmetic on the magnitude: one
-          number per second, no pauses and no sleep. A million seconds is
-          eleven and a half days.
-        </li>
-        <li>
-          <strong>The size of one dot</strong> is measured from the drawing on
-          your screen, at your window size, in CSS pixels. Resize the window and
-          the figure changes, because it is a measurement rather than a claim.
-        </li>
-        <li>
-          Past a certain zoom a single dot is smaller than one pixel, so it
-          cannot be drawn as a dot at all. Where that happens each block is
-          filled at exactly the fraction of its area the dots cover — the same
-          average brightness they would have made, not a stand-in for a number
-          the screen cannot hold. That the screen runs out before the number
-          does is the point, so it would be a strange thing to fake.
-        </li>
-      </ul>
-    </section>
-  </main>
-
-  <footer class="wrap">
-    <p>
-      Built for COMP4020 at the ANU. One idea, one mechanic, and a dot that
-      refuses to get bigger.
+    <p class="payoff" data-payoff>
+      Every dot is the one you started with, at the same size. You have looked at
+      all of them. You just cannot find the first one any more.
     </p>
-  </footer>
+  </div>
+
+  <section class="about" id="about">
+    <h2>About these numbers</h2>
+    <ul>
+      <li>
+        No dataset — only the powers of ten. The drawing holds exactly as many
+        dots as the number says.
+      </li>
+      <li>
+        <strong>Counting time</strong> is arithmetic on the magnitude: one number
+        per second, no pauses and no sleep.
+      </li>
+      <li>
+        <strong>The size of one dot</strong> is measured from the drawing on your
+        screen, at your window size. Resize and it changes, because it is a
+        measurement rather than a claim.
+      </li>
+      <li>
+        Past a certain zoom one dot is smaller than one pixel, so each block is
+        filled at exactly the fraction of its area the dots cover — the same
+        average brightness they would have made. That the screen runs out before
+        the number does is the point, so faking it would be strange.
+      </li>
+      <li>Built for COMP4020 at the ANU.</li>
+    </ul>
+  </section>
 
   <script>
     import { start } from "../scripts/explainer";

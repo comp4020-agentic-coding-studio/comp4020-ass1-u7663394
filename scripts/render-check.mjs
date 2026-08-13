@@ -351,6 +351,54 @@ async function probeKeyboardReach(client, sessionId) {
 }
 
 /**
+ * Is the drawing drawing anything?
+ *
+ * Added after a layout change squeezed the field off the side of the phone
+ * screen and left the stage blank. Every other check stayed green: the markup
+ * was right, the interaction reported a change, nothing overflowed, no
+ * exception was thrown. A canvas is opaque to all of them, and I only found it
+ * because I opened the screenshots. So: sample the pixels and report the
+ * fraction that differ from the corner, which is what "there is a picture here"
+ * means without knowing what the picture is.
+ */
+async function probeCanvasInk(client, sessionId) {
+  return evaluate(
+    client,
+    sessionId,
+    `(() => {
+      const canvases = [...document.querySelectorAll("[data-core-output] canvas")];
+      if (canvases.length === 0) return JSON.stringify({ present: false, ink: 1 });
+      let lit = 0;
+      let total = 0;
+      for (const canvas of canvases) {
+        const context = canvas.getContext("2d");
+        if (!context || canvas.width === 0) continue;
+        const { data, width, height } = context.getImageData(0, 0, canvas.width, canvas.height);
+        const at = (x, y) => (y * width + x) * 4;
+        const base = at(0, 0);
+        const step = Math.max(1, Math.floor(Math.min(width, height) / 220));
+        for (let y = 0; y < height; y += step) {
+          for (let x = 0; x < width; x += step) {
+            const i = at(x, y);
+            total += 1;
+            const far =
+              Math.abs(data[i] - data[base]) +
+              Math.abs(data[i + 1] - data[base + 1]) +
+              Math.abs(data[i + 2] - data[base + 2]) +
+              Math.abs(data[i + 3] - data[base + 3]);
+            if (far > 24) lit += 1;
+          }
+        }
+      }
+      return JSON.stringify({
+        present: true,
+        ink: total === 0 ? 0 : Math.round((lit / total) * 10000) / 10000,
+      });
+    })()`,
+  );
+}
+
+/**
  * Resize while the interaction is still in flight, then check the page again.
  * A layout that only reflows correctly from a standing start is exactly the
  * failure the marker's "resize mid-use" is looking for.
@@ -531,6 +579,7 @@ try {
       // artefact band.
       const core = await probeInteraction(client, sessionId);
       const reach = await probeKeyboardReach(client, sessionId);
+      const ink = await probeCanvasInk(client, sessionId);
       const resized = core.present
         ? await probeResizeMidUse(client, sessionId, viewport)
         : { width: viewport.width, overflow: 0, offenders: [] };
@@ -550,7 +599,8 @@ try {
         (!core.present || (core.focused && core.changed)) &&
         reach.reached === reach.total &&
         resized.overflow === 0 &&
-        pageErrors.length === 0;
+        pageErrors.length === 0 &&
+        (!ink.present || ink.ink >= 0.002);
       if (!ok) failures += 1;
       const coreStatus = !core.present
         ? "n/a"
@@ -566,11 +616,17 @@ try {
           `h1 ${probe.h1}  unrevealed ${hidden.value}  ` +
           `interaction ${coreStatus.padEnd(13)} ` +
           `tab ${reach.reached}/${reach.total}  ` +
+          `ink ${ink.present ? `${(ink.ink * 100).toFixed(1)}%` : "n/a"}  ` +
           `resized@${resized.width} overflow ${resized.overflow}px  ` +
           `height ${probe.height}px`,
       );
       for (const error of pageErrors) {
         console.log(`         uncaught: ${error.split("\n")[0]}`);
+      }
+      if (ink.present && ink.ink < 0.002) {
+        console.log(
+          "         the canvas is blank — the drawing is not reaching the screen",
+        );
       }
       if (reach.reached !== reach.total) {
         console.log(

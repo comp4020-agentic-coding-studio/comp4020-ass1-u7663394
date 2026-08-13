@@ -1,35 +1,39 @@
 // The interactive part: state, the canvas renderer, and the controls.
 //
-// The one rule this file exists to keep is in ../lib/layout.ts — the dot is a
-// constant, and the camera is the only thing that moves. Everything below is in
-// service of showing that honestly at 60fps, at any window size, from the
-// keyboard.
+// Two rules this file exists to keep, both from CLAUDE.md:
+//   - the dot is a constant (../lib/layout.ts). The camera is the only thing
+//     that moves, and the copies that arrive on a step *translate* — nothing
+//     ever scales a dot, because that would be the page contradicting itself.
+//   - no figure is ever interpolated. The numeral switches discretely; the
+//     measured dot size is written once the drawing has settled and not before.
 
+import { DOT_RADIUS, type Geometry, geometryFor } from "../lib/layout";
 import {
-  COVERAGE,
-  DOT_RADIUS,
-  SIZES,
-  childOffset,
-  fitScale,
-  stopDepth,
-} from "../lib/layout";
+  arrivalOffset,
+  arrivalOpacity,
+  cameraProgress,
+  stepDuration,
+} from "../lib/motion";
 import { LAST_STEP, MAGNITUDES, formatPixels } from "../lib/magnitudes";
 
 const TAU = Math.PI * 2;
 
 /** Cap on how big a single dot is allowed to look, in CSS pixels. */
-const MAX_DOT_PX = 64;
+const MAX_DOT_PX = 62;
 
-const DOT_COLOUR = "#f4ede1";
+/** Breathing room between the field and the edge of its safe box. */
+const PADDING = 18;
+
+const DOT_COLOUR = "247 241 230";
 const MARK_COLOUR = "#ff9f45";
+/** Must match --bg in global.css: the canvas paints its own base so the
+    motion trail decays to the page colour instead of to transparency. */
+const STAGE_BG = "7 8 11";
 
 const clamp = (value: number, low: number, high: number): number =>
   Math.min(high, Math.max(low, value));
 
 const lerp = (from: number, to: number, t: number): number => from + (to - from) * t;
-
-const easeInOut = (t: number): number =>
-  t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
 
 export function start(): void {
   const root = document.documentElement;
@@ -40,6 +44,8 @@ export function start(): void {
   const measure = document.querySelector<HTMLElement>("[data-measure]");
   const back = document.querySelector<HTMLButtonElement>("[data-back]");
   const next = document.querySelector<HTMLButtonElement>("[data-next]");
+  /** Overlays the drawing must stay clear of, so the field never sits under text. */
+  const overlays = [...document.querySelectorAll<HTMLElement>("[data-overlay]")];
 
   if (!canvas || !frame || !slider || !back || !next) return;
   const ctx = canvas.getContext("2d");
@@ -47,13 +53,18 @@ export function start(): void {
 
   // Only now does the page get to depend on script. Everything above this line
   // is readable without it: all seven magnitudes ship in the HTML, and the CSS
-  // that collapses the inactive ones is gated on this attribute.
+  // that lifts them into an overlay — and collapses the inactive ones — is
+  // gated on this attribute.
   root.dataset.js = "on";
 
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
   let cssWidth = 0;
   let cssHeight = 0;
+  /** The rectangle inside the canvas that no overlay covers. */
+  let safe = { x: 0, y: 0, w: 0, h: 0 };
+  /** Which phasing of the nesting suits that rectangle's shape. */
+  let geometry: Geometry = geometryFor(1, 0);
   let position = 0; // continuous, 0–6
   let target = 0; // the step the visitor asked for
   let lastScale = 0;
@@ -64,8 +75,8 @@ export function start(): void {
 
   /* ------------------------------------------------------------- rendering */
 
-  const paint = (pos: number): void => {
-    if (cssWidth === 0 || cssHeight === 0) return;
+  const paint = (pos: number, trail = false): void => {
+    if (safe.w <= 0 || safe.h <= 0) return;
 
     // Which two magnitudes we are between, and how far. At a whole number this
     // resolves to "the upper one, fully drawn", so a settled frame and the last
@@ -73,32 +84,36 @@ export function start(): void {
     const upper = pos <= 0 ? 0 : Math.ceil(pos);
     const lower = Math.max(0, upper - 1);
     const u = pos <= 0 ? 1 : clamp(pos - lower, 0, 1);
+    const camera = cameraProgress(u);
 
+    const { sizes, coverage, childOffset } = geometry;
     const cap = MAX_DOT_PX / (2 * DOT_RADIUS);
-    const scaleLow = Math.min(fitScale(lower, cssWidth, cssHeight), cap);
-    const scaleHigh = Math.min(fitScale(upper, cssWidth, cssHeight), cap);
+    const scaleLow = Math.min(geometry.fitScale(lower, safe.w, safe.h), cap);
+    const scaleHigh = Math.min(geometry.fitScale(upper, safe.w, safe.h), cap);
     // Interpolated in log space: a zoom that is linear in scale reads as a
     // lurch, because what the eye tracks is the rate of change of magnitude.
-    const scale = Math.exp(lerp(Math.log(scaleLow), Math.log(scaleHigh), u));
+    const scale = Math.exp(lerp(Math.log(scaleLow), Math.log(scaleHigh), camera));
     lastScale = scale;
 
-    const centreX = lerp(SIZES[lower].w / 2, SIZES[upper].w / 2, u);
-    const centreY = lerp(SIZES[lower].h / 2, SIZES[upper].h / 2, u);
-    const originX = cssWidth / 2 - centreX * scale;
-    const originY = cssHeight / 2 - centreY * scale;
+    const centreX = lerp(sizes[lower].w / 2, sizes[upper].w / 2, camera);
+    const centreY = lerp(sizes[lower].h / 2, sizes[upper].h / 2, camera);
+    const originX = safe.x + safe.w / 2 - centreX * scale;
+    const originY = safe.y + safe.h / 2 - centreY * scale;
     const toX = (wx: number): number => originX + wx * scale;
     const toY = (wy: number): number => originY + wy * scale;
 
-    ctx.clearRect(0, 0, cssWidth, cssHeight);
+    // A trail during the move and a hard base at rest. The blur is camera
+    // language, not data: the settled frame is always painted clean.
+    ctx.fillStyle = trail ? `rgb(${STAGE_BG} / 40%)` : `rgb(${STAGE_BG})`;
+    ctx.fillRect(0, 0, cssWidth, cssHeight);
 
     // Never fill the whole top block as one rect: the split between "the block
     // you already had" and "the nine that just arrived" is the explanation.
-    const stop = Math.min(stopDepth(scale, upper), Math.max(0, upper - 1));
-    const kept = new Path2D();
-    const arriving = new Path2D();
+    const stop = Math.min(geometry.stopDepth(scale, upper), Math.max(0, upper - 1));
+    const solidity = stop === 0 ? 1 : coverage[stop];
 
     const collect = (path: Path2D, depth: number, x: number, y: number): void => {
-      const size = SIZES[depth];
+      const size = sizes[depth];
       const left = toX(x);
       const top = toY(y);
       const width = size.w * scale;
@@ -122,47 +137,70 @@ export function start(): void {
       }
     };
 
+    const fill = (path: Path2D, alpha: number): void => {
+      ctx.fillStyle = `rgb(${DOT_COLOUR} / ${(solidity * alpha * 100).toFixed(2)}%)`;
+      ctx.fill(path);
+    };
+
     if (upper === 0) {
-      collect(kept, 0, 0, 0);
+      const only = new Path2D();
+      collect(only, 0, 0, 0);
+      fill(only, 1);
     } else {
-      for (let index = 0; index < 10; index += 1) {
-        const offset = childOffset(upper, index);
-        collect(index === 0 ? kept : arriving, upper - 1, offset.x, offset.y);
+      // Copy 0 is the block you were already looking at: it is home from the
+      // start and never moves. The other nine travel out of it, in order.
+      const kept = new Path2D();
+      collect(kept, upper - 1, 0, 0);
+      fill(kept, 1);
+
+      for (let index = 1; index < 10; index += 1) {
+        const home = childOffset(upper, index);
+        const travelled = arrivalOffset(u, index);
+        const alpha = arrivalOpacity(u, index);
+        if (alpha <= 0.001) continue;
+        const path = new Path2D();
+        // Pure translation from copy 0's position to its own. Nothing here
+        // touches the dot's size.
+        collect(path, upper - 1, home.x * travelled, home.y * travelled);
+        fill(path, alpha);
       }
     }
 
-    // Below the resolution of a single dot the fill carries the block's exact
-    // coverage, so the average brightness is what a million real dots would
-    // have produced. It is a measurement, not a stand-in.
-    const solidity = stop === 0 ? 1 : COVERAGE[stop];
-    ctx.fillStyle = DOT_COLOUR;
-    ctx.globalAlpha = solidity;
-    ctx.fill(kept);
-    ctx.globalAlpha = solidity * u;
-    ctx.fill(arriving);
-    ctx.globalAlpha = 1;
+    // The previous magnitude's footprint, so "ten of these" stays visible once
+    // the individual dots do not. One hairline, no label.
+    if (upper >= 2) {
+      const box = sizes[upper - 1];
+      ctx.strokeStyle = `rgb(${DOT_COLOUR} / 16%)`;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(
+        toX(0) - 3,
+        toY(0) - 3,
+        box.w * scale + 6,
+        box.h * scale + 6,
+      );
+    }
 
     // The first dot, still there, still the same size. Once it is too small to
     // find, point at it — the pointer is drawn at a fixed screen size and is
     // plainly a pointer, not the dot.
     const dotPx = 2 * DOT_RADIUS * scale;
-    if (pos > 1.35 && dotPx < 26) {
+    if (pos > 1.3 && dotPx < 24) {
       const markX = toX(0.5);
       const markY = toY(0.5);
-      ctx.globalAlpha = clamp((pos - 1.35) / 0.5, 0, 1);
+      ctx.globalAlpha = clamp((pos - 1.3) / 0.5, 0, 1);
       ctx.strokeStyle = MARK_COLOUR;
-      ctx.lineWidth = 1.5;
+      ctx.lineWidth = 1.25;
       ctx.beginPath();
-      ctx.arc(markX, markY, 13, 0, TAU);
+      ctx.arc(markX, markY, 12, 0, TAU);
       ctx.stroke();
       ctx.beginPath();
-      ctx.moveTo(markX + 13, markY);
-      ctx.lineTo(markX + 21, markY);
+      ctx.moveTo(markX + 12, markY);
+      ctx.lineTo(markX + 20, markY);
       ctx.stroke();
       ctx.fillStyle = MARK_COLOUR;
-      ctx.font = "600 12px system-ui, -apple-system, sans-serif";
+      ctx.font = "600 11px system-ui, -apple-system, sans-serif";
       ctx.textBaseline = "middle";
-      ctx.fillText("1", markX + 25, markY + 1);
+      ctx.fillText("1", markX + 24, markY + 1);
       ctx.globalAlpha = 1;
     }
   };
@@ -189,17 +227,16 @@ export function start(): void {
   const syncMeasurement = (): void => {
     if (!measure) return;
     const dotPx = 2 * DOT_RADIUS * lastScale;
-    measure.textContent =
-      `On this screen, right now, one dot is ${formatPixels(dotPx)} across.`;
+    measure.textContent = `one dot: ${formatPixels(dotPx)} across`;
   };
 
   /* --------------------------------------------------------------- motion */
 
   const step = (now: number): void => {
     const t = tweenLength === 0 ? 1 : clamp((now - tweenStart) / tweenLength, 0, 1);
-    position = lerp(tweenFrom, target, easeInOut(t));
-    paint(position);
+    position = lerp(tweenFrom, target, t);
     if (t < 1) {
+      paint(position, !reduceMotion.matches);
       frameId = requestAnimationFrame(step);
     } else {
       frameId = 0;
@@ -226,20 +263,94 @@ export function start(): void {
 
     // Interrupting mid-zoom picks up from wherever the camera actually is,
     // rather than snapping — a visitor holding the arrow key should see one
-    // continuous pull-back, not seven jump cuts.
+    // continuous pull-back, not seven jump cuts. The easing lives in
+    // ../lib/motion.ts and is applied per magnitude, so `position` advances
+    // linearly and each power of ten gets the full two beats.
     tweenFrom = position;
     tweenStart = performance.now();
-    tweenLength = Math.min(1800, 240 + 620 * Math.abs(target - tweenFrom));
+    tweenLength = stepDuration(target - tweenFrom);
     if (frameId === 0) frameId = requestAnimationFrame(step);
   };
 
   /* --------------------------------------------------------------- fitting */
 
+  /**
+   * The part of the canvas no overlay covers, in CSS pixels.
+   *
+   * Each overlay clips one frame edge, and which one is chosen by how much room
+   * the cut costs — not by which edge the overlay sits nearest. Distance was the
+   * first attempt and it was wrong in a way worth keeping a note about: the
+   * readout runs the full width of a phone, so it is flush with the left edge as
+   * well as the bottom one, and the nearest-edge rule cut the *left* side off
+   * the whole frame. The field was squeezed into a 64px sliver off the right of
+   * the screen and the phone stage came out blank.
+   *
+   * Reading the layout instead of being told about it per breakpoint is what
+   * lets one renderer serve the phone (title above, readout and control below)
+   * and the wide screen (readout in a column down the left) — but the rule has
+   * to be about area, because area is what the drawing actually needs.
+   */
+  const measureSafeBox = (): void => {
+    const box = frame.getBoundingClientRect();
+    const edges = { top: box.top, bottom: box.bottom, left: box.left, right: box.right };
+    for (const overlay of overlays) {
+      const rect = overlay.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) continue;
+      const cost = {
+        top: box.width * Math.max(0, rect.bottom - box.top),
+        bottom: box.width * Math.max(0, box.bottom - rect.top),
+        left: box.height * Math.max(0, rect.right - box.left),
+        right: box.height * Math.max(0, box.right - rect.left),
+      };
+      const cheapest = (Object.keys(cost) as (keyof typeof cost)[]).reduce((best, edge) =>
+        cost[edge] < cost[best] ? edge : best,
+      );
+      if (cheapest === "top") edges.top = Math.max(edges.top, rect.bottom);
+      else if (cheapest === "bottom") edges.bottom = Math.min(edges.bottom, rect.top);
+      else if (cheapest === "left") edges.left = Math.max(edges.left, rect.right);
+      else edges.right = Math.min(edges.right, rect.left);
+    }
+    const width = edges.right - edges.left - PADDING * 2;
+    const height = edges.bottom - edges.top - PADDING * 2;
+    // If the overlays have eaten the frame, draw in the whole thing rather than
+    // in a sliver: an unreadable overlap is a better failure than a blank stage.
+    const room = width > box.width * 0.2 && height > box.height * 0.2;
+    safe = room
+      ? {
+          x: edges.left - box.left + PADDING,
+          y: edges.top - box.top + PADDING,
+          w: width,
+          h: height,
+        }
+      : {
+          x: PADDING,
+          y: PADDING,
+          w: Math.max(64, box.width - PADDING * 2),
+          h: Math.max(64, box.height - PADDING * 2),
+        };
+    geometry = geometryFor(safe.w, safe.h);
+  };
+
   const resize = (): void => {
     const rect = frame.getBoundingClientRect();
     if (rect.width === 0 || rect.height === 0) return;
+
+    // Belt to the CSS's braces. The overlays are observed, and this handler
+    // writes text into one of them, so a change that did feed back would
+    // reflow forever. Nothing downstream runs unless something actually moved.
+    const before = { ...safe, cssWidth, cssHeight };
     cssWidth = rect.width;
     cssHeight = rect.height;
+    measureSafeBox();
+    const unchanged =
+      before.cssWidth === cssWidth &&
+      before.cssHeight === cssHeight &&
+      before.x === safe.x &&
+      before.y === safe.y &&
+      before.w === safe.w &&
+      before.h === safe.h;
+    if (unchanged) return;
+
     const ratio = Math.min(2, window.devicePixelRatio || 1);
     canvas.width = Math.max(1, Math.round(cssWidth * ratio));
     canvas.height = Math.max(1, Math.round(cssHeight * ratio));
@@ -274,6 +385,7 @@ export function start(): void {
 
   const observer = new ResizeObserver(resize);
   observer.observe(frame);
+  for (const overlay of overlays) observer.observe(overlay);
 
   // Turning reduced motion on mid-zoom has to *end* the zoom, not just repaint
   // it. The first version only repainted, so a visitor who switched the setting
