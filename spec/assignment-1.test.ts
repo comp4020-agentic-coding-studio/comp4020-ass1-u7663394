@@ -173,51 +173,74 @@ describe("A1: the visitor does something that changes what they see", () => {
 /* ---------------------------------------------- carried forward from crit 2 */
 
 describe("A1: internal links survive the base path", () => {
-  // Root-absolute links are correct only when served at exactly the deploy
-  // prefix. Last week they put 13 broken links in front of CI and would have
-  // blocked the deploy, since `deploy` needs `check`. This resolves every
-  // internal link against dist — the same thing CI's crawl does, in
-  // milliseconds instead of a pipeline run.
+  // Root-absolute URLs are correct only when served at exactly the deploy
+  // prefix. In crit 2 they put 13 broken links in front of CI and would have
+  // blocked the deploy, since `deploy` needs `check`.
+  //
+  // The first version of this test banned root-absolute URLs outright, and it
+  // went red on the stylesheet and the script — which Astro emits as
+  // `/comp4020-ass1-u7663394/_astro/…`, already carrying the base. Those
+  // resolve correctly on the deployed URL; a bare `/about/` does not. Banning
+  // both put the sensor in the position of arguing against the framework's
+  // correct output, which is how a check gets worked around instead of read.
+  //
+  // So the rule is stated as what actually breaks: a root-absolute URL is an
+  // error unless it is prefixed with the configured base. The base is read
+  // from astro.config.ts rather than written down a second time, because two
+  // copies of a path drift.
+  const BASE = (readFileSync("astro.config.ts", "utf8").match(
+    /base:\s*["'`]([^"'`]*)["'`]/,
+  )?.[1] ?? "").replace(/\/$/, "");
+
   const internal = (value: string): boolean =>
     !/^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(value);
 
-  it("uses no root-absolute internal URLs", () => {
+  it("knows the base path it is checking against", () => {
+    expect(BASE, "astro.config.ts has no `base`, so this test can't mean anything")
+      .not.toBe("");
+  });
+
+  it("root-absolute URLs all carry the deploy base", () => {
     const offenders: string[] = [];
     for (const { name, doc } of pages) {
       for (const el of doc.querySelectorAll("[href], [src]")) {
         const value = el.getAttribute("href") ?? el.getAttribute("src") ?? "";
-        if (value.startsWith("/") && !value.startsWith("//")) {
-          offenders.push(`${name}: ${value}`);
-        }
+        if (!value.startsWith("/") || value.startsWith("//")) continue;
+        if (value === BASE || value.startsWith(`${BASE}/`)) continue;
+        offenders.push(`${name}: ${value}`);
       }
     }
     expect(
       offenders,
-      `root-absolute internal URLs break under the base path:\n  ${offenders.join("\n  ")}`,
+      `root-absolute URLs without the base ${BASE} 404 on the deployed site.\n` +
+        `Author internal links relative (./, ../) or prefix import.meta.env.BASE_URL:\n  ` +
+        offenders.join("\n  "),
     ).toEqual([]);
   });
 
-  it("resolves every internal link to something that was built", () => {
+  it("resolves every internal URL to something that was built", () => {
+    // Both kinds, resolved the way a browser would: relative against the page,
+    // base-prefixed against dist. The same thing CI's crawl does, in
+    // milliseconds instead of a pipeline run.
     const missing: string[] = [];
     for (const { name, path, doc } of pages) {
-      for (const el of doc.querySelectorAll("a[href]")) {
-        const raw = el.getAttribute("href") ?? "";
+      for (const el of doc.querySelectorAll("a[href], link[href], script[src], img[src]")) {
+        const raw = el.getAttribute("href") ?? el.getAttribute("src") ?? "";
         if (!internal(raw)) continue;
         const clean = raw.split("#")[0].split("?")[0];
         if (clean === "") continue;
-        const target = resolve(dirname(path), clean);
-        const candidates = [
-          target,
-          `${target}.html`,
-          join(target, "index.html"),
-        ];
+
+        const target = clean.startsWith("/")
+          ? resolve(DIST, clean.slice(BASE.length + 1) || ".")
+          : resolve(dirname(path), clean);
+        const candidates = [target, `${target}.html`, join(target, "index.html")];
         const found = candidates.some(
           (candidate) => existsSync(candidate) && statSync(candidate).isFile(),
         );
         if (!found) missing.push(`${name}: ${raw}`);
       }
     }
-    expect(missing, `dead internal links:\n  ${missing.join("\n  ")}`).toEqual([]);
+    expect(missing, `dead internal URLs:\n  ${missing.join("\n  ")}`).toEqual([]);
   });
 });
 

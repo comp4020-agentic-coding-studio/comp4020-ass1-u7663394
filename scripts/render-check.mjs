@@ -420,27 +420,79 @@ try {
           { features: [{ name: "prefers-reduced-motion", value: "reduce" }] },
           sessionId,
         );
-        await client.send(
-          "Runtime.evaluate",
-          {
-            expression: `(async () => {
-              window.scrollTo(0, 0);
-              await new Promise((r) => setTimeout(r, 250));
+        // Reload: the interaction probe above has already driven the control,
+        // and a shot of wherever it happened to stop is not a state anyone
+        // designed.
+        await client.send("Page.navigate", { url }, sessionId);
+        await sleep(600);
+
+        // One shot per state, not one per page. An explainer's whole artefact
+        // is the sequence the control moves through, and the first version of
+        // this script photographed only the landing state — the two magnitudes
+        // where the layout actually gets hard were never in the folder I was
+        // looking at. If the marked control is a range, walk it.
+        const shots = Number(
+          await evaluate(
+            client,
+            sessionId,
+            `(() => {
+              const control = document.querySelector("[data-core-interaction]");
+              if (!control || control.tagName !== "INPUT" || control.type !== "range") return "1";
+              const stride = Number(control.step) || 1;
+              return String((Number(control.max) - Number(control.min)) / stride + 1);
             })()`,
-            awaitPromise: true,
-          },
-          sessionId,
+          ),
         );
 
-        const { data } = await client.send(
-          "Page.captureScreenshot",
-          { format: "png", captureBeyondViewport: true },
-          sessionId,
-        );
-        await writeFile(
-          join(shotsDir, `${viewport.name}-${page.name.replace(/\//g, "-")}.png`),
-          Buffer.from(data, "base64"),
-        );
+        for (let index = 0; index < shots; index += 1) {
+          if (index > 0) {
+            // Trusted key events again, for the same reason probeInteraction
+            // uses them: setting .value in-page would photograph a state the
+            // keyboard cannot actually reach.
+            await evaluate(
+              client,
+              sessionId,
+              `(() => { document.querySelector("[data-core-interaction]").focus(); return "0"; })()`,
+            );
+            for (const type of ["rawKeyDown", "keyUp"]) {
+              await client.send(
+                "Input.dispatchKeyEvent",
+                {
+                  type,
+                  key: "ArrowRight",
+                  code: "ArrowRight",
+                  windowsVirtualKeyCode: 39,
+                  nativeVirtualKeyCode: 39,
+                },
+                sessionId,
+              );
+            }
+            await sleep(250);
+          }
+
+          await client.send(
+            "Runtime.evaluate",
+            {
+              expression: `(async () => {
+                window.scrollTo(0, 0);
+                await new Promise((r) => setTimeout(r, 200));
+              })()`,
+              awaitPromise: true,
+            },
+            sessionId,
+          );
+
+          const { data } = await client.send(
+            "Page.captureScreenshot",
+            { format: "png", captureBeyondViewport: true },
+            sessionId,
+          );
+          const stem = `${viewport.name}-${page.name.replace(/\//g, "-")}`;
+          await writeFile(
+            join(shotsDir, shots === 1 ? `${stem}.png` : `${stem}-${index}.png`),
+            Buffer.from(data, "base64"),
+          );
+        }
         await client.send("Emulation.setEmulatedMedia", { features: [] }, sessionId);
       }
     }

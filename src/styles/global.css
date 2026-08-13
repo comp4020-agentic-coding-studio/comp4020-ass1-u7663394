@@ -1,16 +1,484 @@
-body {
-  margin: 0;
-  padding: 2rem;
-  font-family: system-ui, sans-serif;
-  line-height: 1.6;
-  color: #1a1a1a;
+/* How big is a million?
+ *
+ * Dark, because the argument is about a small bright unit disappearing into a
+ * field of them, and a light background loses that at the last two magnitudes.
+ *
+ * Two layout rules carried forward from earlier weeks, both earned:
+ *   - auto-fit tracks are always minmax(min(<size>, 100%), 1fr); a bare
+ *     minmax(26rem, 1fr) cannot shrink below 26rem and overflowed a 390px phone
+ *   - nothing is position: fixed, so nothing has to give its flow height back
+ */
+
+:root {
+  --ink: #f4ede1;
+  --ink-dim: #a8a094;
+  --ink-faint: #6f6a62;
+  --bg: #0a0b0f;
+  --bg-raised: #12141b;
+  --line: #24262f;
+  --accent: #ff9f45;
+  --focus: #7cc4ff;
+  --measure: 34rem;
+  --gap: clamp(1.25rem, 3vw, 2.25rem);
+
+  color-scheme: dark;
 }
 
-main {
-  max-width: 40rem;
-  margin: 0 auto;
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(120% 80% at 50% 0%, #14161f 0%, var(--bg) 62%) no-repeat,
+    var(--bg);
+  color: var(--ink);
+  font-family: system-ui, -apple-system, "Segoe UI", roboto, sans-serif;
+  font-size: clamp(1rem, 0.94rem + 0.3vw, 1.08rem);
+  line-height: 1.6;
+  min-height: 100svh;
+}
+
+.wrap {
+  width: 100%;
+  max-width: 82rem;
+  margin-inline: auto;
+  padding-inline: clamp(1.1rem, 4vw, 3rem);
+}
+
+.skip {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 10;
+  padding: 0.6rem 1rem;
+  background: var(--accent);
+  color: #14161f;
+  font-weight: 600;
+}
+
+.skip:focus {
+  left: 0;
 }
 
 a {
-  color: #0b5fff;
+  color: var(--ink);
+  text-underline-offset: 0.2em;
+  text-decoration-color: var(--ink-faint);
+}
+
+a:hover {
+  text-decoration-color: var(--accent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+
+/* ------------------------------------------------------------------ header */
+
+.masthead {
+  padding-block: 1.1rem 0;
+}
+
+.masthead nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem 1.4rem;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.82rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.masthead a {
+  text-decoration: none;
+  color: var(--ink-dim);
+}
+
+.masthead a:hover {
+  color: var(--ink);
+}
+
+.masthead-home {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+/* ------------------------------------------------------------------- intro */
+
+main {
+  padding-block: clamp(2rem, 5vw, 3.5rem) 0;
+}
+
+.intro {
+  max-width: var(--measure);
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(2.1rem, 1.2rem + 4.4vw, 4rem);
+  line-height: 1.02;
+  letter-spacing: -0.03em;
+  font-weight: 700;
+  text-wrap: balance;
+}
+
+.lede {
+  margin: 0.9rem 0 0;
+  font-size: clamp(1.15rem, 1rem + 0.8vw, 1.5rem);
+  line-height: 1.3;
+  color: var(--accent);
+  text-wrap: balance;
+}
+
+.sub {
+  margin: 0.85rem 0 0;
+  color: var(--ink-dim);
+  text-wrap: pretty;
+}
+
+/* --------------------------------------------------------------- explainer */
+
+.explainer {
+  display: grid;
+  gap: var(--gap);
+  margin-block: clamp(1.5rem, 4vw, 3rem);
+}
+
+/* The figure is the marked [data-core-output] region, so it stays in the DOM,
+   but on a phone the drawing and the controls have to be reachable without
+   scrolling past a paragraph to get to them. `display: contents` lifts its two
+   halves into the explainer grid, which is what lets the controls sit directly
+   under the drawing on a narrow screen and beside it on a wide one. */
+.stage {
+  display: contents;
+}
+
+.stage-frame {
+  order: 1;
+  position: relative;
+  height: clamp(13rem, 40svh, 20rem);
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background: var(--bg-raised);
+  overflow: hidden;
+}
+
+.stage-caption {
+  order: 3;
+}
+
+.stage-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.magnitudes {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.magnitude-figure {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.2rem 0.8rem;
+  margin: 0;
+}
+
+.magnitude-numeral {
+  font-size: clamp(2rem, 1.2rem + 3.4vw, 3.25rem);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.magnitude-name {
+  font-size: 0.82rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.magnitude-note {
+  margin: 0.7rem 0 0;
+  max-width: var(--measure);
+  text-wrap: pretty;
+}
+
+.magnitude-counting,
+.magnitude-measure {
+  margin: 0.6rem 0 0;
+  max-width: var(--measure);
+  font-size: 0.85rem;
+  color: var(--ink-faint);
+}
+
+.magnitude-counting strong {
+  color: var(--ink-dim);
+  font-weight: 600;
+}
+
+/* Without JavaScript this list stays a readable list of all seven magnitudes.
+   The collapse is gated on an attribute script has already set, and the text
+   is in the served HTML either way. */
+.magnitude + .magnitude {
+  margin-top: 1.75rem;
+  padding-top: 1.75rem;
+  border-top: 1px solid var(--line);
+}
+
+[data-js="on"] .magnitude + .magnitude {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+/* ---------------------------------------------------------------- controls */
+
+.controls {
+  order: 2;
+  padding: 1.1rem 1.15rem 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background: var(--bg-raised);
+  min-width: 0;
+}
+
+.controls-label {
+  display: block;
+  font-size: 0.75rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.controls-slider {
+  display: block;
+  width: 100%;
+  margin: 0.85rem 0 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.controls-marks {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.2rem;
+  padding-inline: 0.25rem;
+  margin: 0.35rem 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.controls-marks li {
+  min-width: 0;
+}
+
+.controls-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(8.5rem, 100%), 1fr));
+  gap: 0.6rem;
+  margin-top: 1.1rem;
+}
+
+.button {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 0.55rem;
+  background: #191c25;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.92rem;
+  cursor: pointer;
+}
+
+.button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.button:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.button span[aria-hidden="true"] {
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.button:disabled span[aria-hidden="true"] {
+  color: var(--ink-faint);
+}
+
+.controls-hint {
+  margin: 0.9rem 0 0;
+  font-size: 0.8rem;
+  color: var(--ink-faint);
+  text-wrap: pretty;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+kbd {
+  padding: 0.05em 0.35em;
+  border: 1px solid var(--line);
+  border-radius: 0.25rem;
+  background: #1d202a;
+  font: inherit;
+  font-size: 0.9em;
+}
+
+/* ------------------------------------------------------------------ payoff */
+
+.payoff {
+  order: 4;
+  margin: 0;
+  padding: 1rem 1.15rem;
+  border-left: 2px solid var(--accent);
+  max-width: var(--measure);
+  color: var(--ink);
+  text-wrap: pretty;
+}
+
+/* Gated on an attribute script sets, never hidden by default: without
+   JavaScript the payoff is simply visible, which is the honest fallback. */
+[data-js="on"] .payoff {
+  display: none;
+}
+
+[data-js="on"][data-at-end] .payoff {
+  display: block;
+  animation: arrive 500ms ease both;
+}
+
+@keyframes arrive {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+}
+
+/* ------------------------------------------------------------------- notes */
+
+.notes {
+  max-width: var(--measure);
+  margin-block: clamp(2.5rem, 6vw, 4rem) 0;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--line);
+}
+
+.notes h2 {
+  margin: 0 0 0.75rem;
+  font-size: 0.82rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  font-weight: 600;
+}
+
+.notes ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: var(--ink-faint);
+  font-size: 0.9rem;
+}
+
+.notes li + li {
+  margin-top: 0.6rem;
+}
+
+.notes strong {
+  color: var(--ink-dim);
+}
+
+footer {
+  padding-block: 2.5rem 3rem;
+  color: var(--ink-faint);
+  font-size: 0.8rem;
+}
+
+footer p {
+  margin: 0;
+  max-width: var(--measure);
+}
+
+/* ------------------------------------------------------------ wide screens */
+
+@media (width >= 62rem) {
+  .explainer {
+    grid-template-columns: minmax(0, 1fr) minmax(20rem, 26rem);
+    /* The trailing 1fr matters: without it the drawing, which spans all three
+       rows, stretches them and pushes the caption, the controls and the payoff
+       apart into three floating islands. The spare height goes to a row nobody
+       is in. */
+    grid-template-rows: auto auto 1fr;
+    align-items: start;
+  }
+
+  .stage-frame {
+    grid-area: 1 / 1 / 4 / 2;
+    height: min(74svh, 42rem);
+  }
+
+  .stage-caption {
+    grid-area: 1 / 2 / 2 / 3;
+  }
+
+  .controls {
+    grid-area: 2 / 2 / 3 / 3;
+  }
+
+  .payoff {
+    grid-area: 3 / 2 / 4 / 3;
+    align-self: start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
