@@ -47,19 +47,21 @@ the nine arriving copies. The exact million is drawn once on settle. Performance
 sampling may reduce future detail; it may not erase the past
 ([`3f2348b`](https://github.com/comp4020-agentic-coding-studio/comp4020-ass1-u7663394/commit/3f2348b)).
 
-### The canvas needed a sensor that could see WebGL
+### One camera view could not show extent and detail
 
-The existing ink probe only understood a 2D canvas, while headless Chrome had
-WebGL disabled. The page correctly showed its fallback and the sensor reported
-“blank”. The render harness now boots software WebGL, copies the composited
-canvas to a 2D sampling surface, counts real non-background pixels, and waits
-for the two-beat transition to settle before inspecting it. Both marked
-viewports now verify keyboard operation, all controls by Tab, ink, and a resize
-mid-transition
-([`7b0d858`](https://github.com/comp4020-agentic-coding-studio/comp4020-ass1-u7663394/commit/7b0d858)).
+At 100,000 and 1,000,000, additive points collapsed into interference patterns.
+A permanent close-up made individual blocks clear but concealed the total size;
+the fitted overview did the opposite. I separated those jobs. Each dense state
+now holds a complete overview, travels into the lattice over an 18-second path,
+then returns. Every point stays fixed, while interiors recede and the faces and
+edges of each 1,000-point volume carry the structure. The million overview is
+exact; its moving close view uses a stable `50×50×50` sample. Because normal
+screenshots request reduced motion, I added `pnpm shots:inspection` to capture
+the otherwise invisible close state at both marked viewports
+([`ec6d17d`](https://github.com/comp4020-agentic-coding-studio/comp4020-ass1-u7663394/commit/ec6d17d)).
 
 ## Where to look
 
-`src/lib/layout.ts` is the spatial argument, `src/scripts/lattice-renderer.ts`
-is the WebGL implementation, and `AGENTS.md` records the rules this iteration
-earned.
+`src/lib/layout.ts` is the spatial argument, `src/lib/inspection.ts` is the
+dense-state camera path, `src/scripts/lattice-renderer.ts` is the WebGL
+implementation, and `CLAUDE.md` records the rules this iteration earned.

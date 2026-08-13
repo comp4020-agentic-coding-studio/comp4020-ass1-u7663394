@@ -218,10 +218,10 @@ Two rules this idea adds to the ones below, both load-bearing:
   pretty and no longer says anything.
 - **Below one pixel, preserve coverage.** The WebGL point sprite clamps to one
   device pixel because a display cannot emit less, then multiplies opacity by
-  the square of the point's projected size. The settled final state still draws
-  exactly one million vertices. During motion only, a deterministic sample is
-  spread through the future copies so the frame rate survives; see the motion
-  rule below.
+  the square of the point's projected size. The full million-point overview
+  still draws exactly one million vertices. The transition samples only future
+  copies; the close inspection uses a stable `50×50×50` spatial sample. Neither
+  changes the point size; see the motion rules below.
 
 The rules below are not style preferences. Each one is here because something
 went wrong, and the note says what. They were earned in C1 and C2 and carried
@@ -239,7 +239,9 @@ path, and drives real Chrome over the DevTools Protocol at both marked
 viewports (1920×1080 and 390×844), failing on horizontal overflow, on a missing
 or duplicated `h1`, and on `[data-reveal]` content still transparent at the
 bottom of the page. `pnpm shots` writes full-page screenshots to `.shots/` —
-**look at them.**
+**look at them.** It uses reduced motion to make every overview deterministic;
+`pnpm shots:inspection` additionally waits for and captures the close camera
+pass at 100,000 and 1,000,000.
 
 It discovers its own page list from `dist/`, so a page you add is checked
 without touching the script. It is not wired into `pnpm check`: it needs Chrome
@@ -335,6 +337,17 @@ quantity derived from a thing must not also determine that thing.
   is two passes: every old point, then a deterministic sample of the nine
   arriving copies, with the exact million drawn once on settle. Visual
   continuity is part of correctness, not polish to trade for a benchmark.
+- **A dense quantity needs an overview and an inspection, not one compromise
+  view.** Fitting every point made 100,000 and 1,000,000 technically complete
+  but visually unreadable; zooming in permanently would lose their extent.
+  These states now hold the exact overview, travel closer slowly, then return.
+  Reduced motion stays at the overview. `src/lib/inspection.test.ts` holds the
+  timing edges, and `pnpm shots:inspection` makes both views reviewable.
+- **Reveal hierarchy with light, never geometry.** At dense scales every point
+  remains in its exact lattice position and at `DOT_RADIUS`. Interiors recede
+  while the faces, edges, and origins of each 1,000-point volume carry the
+  image. This makes the repeated unit legible without replacing a million with
+  a decorative wireframe.
 
 ## The core interaction is marked in the markup
 
