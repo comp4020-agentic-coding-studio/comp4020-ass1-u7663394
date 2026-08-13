@@ -192,12 +192,34 @@ says about the developer you're becoming.
 
 # This prototype: an interactive explainer (A1)
 
-> **Not yet decided.** The brief asks for an interactive explainer of something
-> more people should know or understand: one strong idea, one dataset or
-> mechanic, and nothing else. Replace this block with what the thing *is* and
-> what the visitor *does* — in one paragraph — as soon as that's settled, and
-> state the core interaction plainly enough that `spec/assignment-1.test.ts` can
-> assert it.
+**How big is a million?** One dot is one. The visitor moves along a scale of
+powers of ten from 1 to 1,000,000 — with a range slider, two buttons, or ←/→
+anywhere on the page — and each step multiplies the dots by ten. The rule the
+page never breaks is the argument: **the dot never changes size.** Only the
+camera moves back. So a step is not a bigger number in a bigger font; it is ten
+copies of the thing you were just looking at, seen from ten times further away.
+By 1,000,000 the first dot is still there, still the same size, and you cannot
+see it. The point of view is the gap between how easily you read "1,000,000" and
+how completely the quantity has escaped you.
+
+The core interaction, stated so `spec/assignment-1.test.ts` and
+`pnpm check:render` can both hold it: **operating any marked control moves the
+magnitude by one power of ten, and the marked output region redraws — the field,
+the numeral, its name, the counting time, and the measured on-screen size of one
+dot.**
+
+Two rules this idea adds to the ones below, both load-bearing:
+
+- **The unit is invariant.** `DOT_RADIUS` in `src/lib/layout.ts` takes no depth
+  argument, so there is nowhere for a per-magnitude size to enter, and
+  `src/lib/layout.test.ts` asserts the nesting holds exactly ten of the previous
+  block with child 0 at the origin. If that stops being true the page is still
+  pretty and no longer says anything.
+- **Below one pixel, fill at the true coverage.** A million dots cannot be drawn
+  as dots. Each block is filled at exactly the fraction of its area the dots
+  occupy, which is the same average brightness they would have made. That the
+  screen runs out before the number does is the point, so faking it would be a
+  strange thing to do.
 
 The rules below are not style preferences. Each one is here because something
 went wrong, and the note says what. They were earned in C1 and C2 and carried
@@ -236,7 +258,28 @@ Three things this cost, which are worth remembering when reading any sensor:
 - A sensor pointed at the wrong server measures nothing and reports success at
   it. The old version assumed a preview server was already running on 4321; it
   now starts and stops its own, because "remember to boot a server first" is a
-  silent-failure mode, not an instruction.
+  silent-failure mode, not an instruction. **That fix was necessary and not
+  sufficient**, which is the sharper version of the lesson: `astro preview` is a
+  *daemon*, it survives `subprocess.kill()`, and a second one does not start —
+  it prints "already running" and exits 0. A whole day's runs measured a server
+  started ten hours earlier. `check:render` now stops any daemon before and
+  after, and — the part that actually holds — compares the bytes the server
+  hands back against `dist/index.html`. **Check identity, not liveness.** A
+  server answering is not evidence it is answering with your build.
+- **Screenshot every state the interaction reaches, not the state it lands in.**
+  `pnpm shots` used to take one image per page, which for an explainer means
+  photographing the first magnitude and none of the six that follow — the two
+  where the layout actually gets hard were never in the folder I was looking at.
+  It now walks a range control with trusted keys and writes one shot per value.
+  The first run of that found a real bug: turning on reduced motion mid-zoom
+  only repainted, leaving the drawing parked between two magnitudes under a
+  number it did not match.
+- **Falsify a new check before trusting it.** Every sensor added this week was
+  run against a deliberately planted fault first — `tabindex="-1"` on a control,
+  a 700px div, a throwing script, an ungated `display: none`, a foreign server
+  squatting on the port. A check that has never been seen to go red is a
+  decoration. This is the same lesson as the overflow threshold below, one step
+  earlier: don't just ask whether the check *can* fail in principle, watch it.
 
 ## The core interaction is marked in the markup
 
@@ -310,6 +353,20 @@ dataset, these two are dead weight and can go.
   Watch for this one: a number ticking up is a stock explainer flourish, so it's
   exactly the thing that gets suggested.
 
+## Two things the toolchain will keep telling you
+
+- **TypeScript drops `const` narrowing inside hoisted `function` declarations.**
+  Thirty-one `'ctx' is possibly 'null'` errors came from guarding
+  `getContext("2d")` at the top of a module and reading it inside
+  `function paint()`. Arrow consts declared after the guard keep the narrowing.
+  Don't reach for `!` — the guard is real, the compiler just can't see the
+  ordering.
+- **Conform to the linter rather than loosening it.** `stylelint-config-standard`
+  rejects BEM `block__element` class names. The obvious move was to relax
+  `selector-class-pattern`; the rule went in the config for a reason and my
+  naming preference is not one. Renaming to kebab-case cost one command. Change
+  a rule when it is *wrong about this codebase*, not when it is inconvenient.
+
 ## URLs: relative in the built output, never root-absolute
 
 The site deploys under `…github.io/<repo>/`, so a root-absolute `/about/` is
@@ -324,6 +381,17 @@ locally and deployed. So: **author internal links relative** (`./`, `../x/`), or
 prefix `import.meta.env.BASE_URL`. Never root-absolute. Assert it in
 `spec/assignment-1.test.ts` by resolving every internal link against `dist` —
 the same thing CI's crawl does, in milliseconds instead of a pipeline run.
+
+One correction to how that rule is *stated*, which matters more than the rule.
+Written as "no root-absolute URLs at all" it went red on Astro's own stylesheet
+and script, which it emits as `/comp4020-ass1-u7663394/_astro/…` — already
+carrying the base, and correct on the deployed URL. A check that argues with the
+framework's correct output is a check that gets worked around instead of read.
+It now says what actually breaks: **a root-absolute URL is an error unless it
+carries the deploy base**, and the base is read from `astro.config.ts` rather
+than written down a second time. When a sensor goes red on something that is
+fine, the bug is usually in how the rule is phrased, not in the page — but fix
+the phrasing, never the threshold.
 
 ## Layout rules that bit
 
