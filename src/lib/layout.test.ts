@@ -11,6 +11,7 @@ import {
   sourceCoordinate,
   type Vec3,
 } from "./layout";
+import { ANIMATED_POINT_BUDGET } from "../scripts/lattice-renderer";
 
 describe("the point is invariant", () => {
   it("has one spacing and one radius for every magnitude", () => {
@@ -92,5 +93,13 @@ describe("a transition copies what was already there", () => {
       expect(copyIndex(step, [0, 0, 0])).toBe(0);
       expect(sourceCoordinate(step, [0, 0, 0])).toEqual([0, 0, 0]);
     }
+  });
+});
+
+describe("the moving frame budget", () => {
+  it("can draw every point through 100,000 and samples only the million", () => {
+    expect(ANIMATED_POINT_BUDGET).toBeGreaterThanOrEqual(100_000);
+    expect(ANIMATED_POINT_BUDGET).toBeLessThan(1_000_000);
+    expect(ANIMATED_POINT_BUDGET - LATTICES[5].count).toBeGreaterThan(0);
   });
 });

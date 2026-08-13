@@ -127,3 +127,11 @@ describe("no figure is ever animated", () => {
     ).toContain("frameId = 0");
   });
 });
+
+describe("the dimensional transition owns its timing once", () => {
+  it("feeds linear position into the renderer instead of double-easing it", () => {
+    const stepBody = source.slice(source.indexOf("const step = "), source.indexOf("const goTo"));
+    expect(stepBody).toContain("lerp(tweenFrom, target, u)");
+    expect(stepBody).not.toMatch(/lerp\(tweenFrom, target, ease/i);
+  });
+});

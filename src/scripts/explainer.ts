@@ -3,7 +3,7 @@
 // what a point, line, plane, and volume look like.
 
 import { LAST_STEP, MAGNITUDES, formatPixels } from "../lib/magnitudes";
-import { easeOutCubic, stepDuration } from "../lib/motion";
+import { stepDuration } from "../lib/motion";
 import {
   createLatticeRenderer,
   type LatticeRenderer,
@@ -91,10 +91,10 @@ export function start(): void {
   const step = (now: number): void => {
     const elapsed = now - tweenStart;
     const u = tweenLength === 0 ? 1 : clamp(elapsed / tweenLength, 0, 1);
-    // Ease only the journey across the scale. Each individual dimensional
-    // step has its own camera-first/copies-second timing inside the renderer.
-    const travelled = easeOutCubic(u);
-    position = lerp(tweenFrom, target, travelled);
+    // Position advances linearly because the dimensional step already owns the
+    // easing. Easing here as well front-loaded the move: the new volume was
+    // mostly present before the viewer had time to register the plane.
+    position = lerp(tweenFrom, target, u);
     paint(position);
 
     if (u < 1) {
@@ -163,7 +163,14 @@ export function start(): void {
   // space before the next transition. It never changes the data, and vanishes
   // under reduced motion or on touch.
   frame.addEventListener("pointermove", (event) => {
-    if (reduceMotion.matches || event.pointerType !== "mouse" || frameId !== 0) return;
+    if (
+      reduceMotion.matches ||
+      event.pointerType !== "mouse" ||
+      frameId !== 0 ||
+      target >= 5
+    ) {
+      return;
+    }
     const rect = frame.getBoundingClientRect();
     parallax = {
       yaw: ((event.clientX - rect.left) / rect.width - 0.5) * 0.11,
