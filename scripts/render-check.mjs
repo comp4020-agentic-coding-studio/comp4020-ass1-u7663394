@@ -5,7 +5,7 @@
 // Chrome over the DevTools Protocol so the two marked viewports -- 1920x1080
 // and 390x844 -- are measured rather than assumed.
 //
-//   node scripts/render-check.mjs [--shots <dir>]
+//   node scripts/render-check.mjs [--shots <dir>] [--inspection-shots]
 //
 // Exits non-zero if any page overflows its viewport horizontally, loses its
 // single h1, or leaves [data-reveal] content transparent at the bottom of the
@@ -39,6 +39,7 @@ const VIEWPORTS = [
 
 const shotsIndex = process.argv.indexOf("--shots");
 const shotsDir = shotsIndex === -1 ? null : process.argv[shotsIndex + 1];
+const inspectionShots = process.argv.includes("--inspection-shots");
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -756,6 +757,41 @@ try {
           );
         }
         await client.send("Emulation.setEmulatedMedia", { features: [] }, sessionId);
+
+        if (inspectionShots) {
+          // Settled shots deliberately use reduced motion, so they can only
+          // prove the overview. Revisit the two dense states with motion on and
+          // wait until their slow camera path reaches the close inspection
+          // hold. These are review artefacts rather than interaction tests;
+          // trusted keyboard operation is already asserted above.
+          for (const index of [5, 6]) {
+            await client.send("Page.navigate", { url }, sessionId);
+            await sleep(650);
+            await evaluate(
+              client,
+              sessionId,
+              `(() => {
+                const control = document.querySelector("[data-core-interaction]");
+                control.value = "${index}";
+                control.dispatchEvent(new Event("input", { bubbles: true }));
+                return "0";
+              })()`,
+            );
+            // A six-step jump is capped at 2.6s; the overview then holds for
+            // 1.8s and approaches for 5.2s. Ten seconds reaches the close hold.
+            await sleep(10_000);
+            const { data } = await client.send(
+              "Page.captureScreenshot",
+              { format: "png", captureBeyondViewport: true },
+              sessionId,
+            );
+            const stem = `${viewport.name}-${page.name.replace(/\//g, "-")}`;
+            await writeFile(
+              join(shotsDir, `${stem}-${index}-detail.png`),
+              Buffer.from(data, "base64"),
+            );
+          }
+        }
       }
     }
   }

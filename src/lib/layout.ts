@@ -58,8 +58,11 @@ const CAMERAS = [
   { yaw: 0.08, pitch: 0.11, roll: -0.03, fit: 0.72 },
   { yaw: -0.7, pitch: 0.46, roll: 0, fit: 0.62 },
   { yaw: -0.48, pitch: 0.38, roll: 0.01, fit: 0.68 },
-  { yaw: -0.58, pitch: 0.61, roll: 0, fit: 0.68 },
-  { yaw: -0.72, pitch: 0.5, roll: 0.01, fit: 0.63 },
+  // The two densest overviews stay nearer the normal of their broadest face.
+  // A steep angle stacked hundreds of rows into the same pixels and produced
+  // moire rather than depth; the inspection camera supplies the close orbit.
+  { yaw: -0.26, pitch: 0.26, roll: 0, fit: 0.82 },
+  { yaw: -0.54, pitch: 0.38, roll: 0.01, fit: 0.78 },
 ] as const;
 
 export const LATTICES: readonly Lattice[] = CAMERAS.map((camera, step) => {

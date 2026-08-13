@@ -12,6 +12,7 @@
     "check:evidence": "node scripts/check-evidence.ts",
     "check:render": "pnpm build && node scripts/render-check.mjs",
     "shots": "pnpm build && node scripts/render-check.mjs --shots .shots",
+    "shots:inspection": "pnpm build && node scripts/render-check.mjs --shots .shots --inspection-shots",
     "test": "vitest run"
   },
   "devDependencies": {

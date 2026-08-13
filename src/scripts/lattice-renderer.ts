@@ -1,4 +1,5 @@
 import { cameraProgress } from "../lib/motion";
+import type { InspectionPose } from "../lib/inspection";
 import { DOT_RADIUS, LATTICES, type Axis, type Lattice, type Vec3 } from "../lib/layout";
 
 const FOV = Math.PI / 4.2;
@@ -29,9 +30,11 @@ uniform vec2 uOffset;
 uniform int uToCount;
 uniform int uIndexStride;
 uniform int uDrawMode;
+uniform float uDense;
 
 out float vAlpha;
 out float vFirst;
+out float vGuide;
 out float vDepthLight;
 
 float axisValue(vec3 value, int axis) {
@@ -76,15 +79,26 @@ void main() {
   // software GPU. During motion gl_VertexID is permuted through the full set,
   // giving an even sample of the real lattice rather than its first corner.
   float id;
-  if (uDrawMode == 1) {
+  vec3 targetCoordinate;
+  if (uDrawMode == 3) {
+    // During the close million-point camera pass, retain the lattice rather
+    // than a random-looking cloud: every second coordinate on all three axes
+    // is a stable 50 × 50 × 50 spatial sample.
+    vec3 sampleDimensions = ceil(uToDimensions / 2.0);
+    targetCoordinate = coordinateFor(float(gl_VertexID), sampleDimensions) * 2.0;
+    id = targetCoordinate.x
+      + targetCoordinate.y * uToDimensions.x
+      + targetCoordinate.z * uToDimensions.x * uToDimensions.y;
+  } else if (uDrawMode == 1) {
     // The complete structure the visitor already has, mapped into copy zero
     // of the target lattice. It must not thin out when the next step begins.
     vec3 kept = coordinateFor(float(gl_VertexID), uFromDimensions);
     id = kept.x + kept.y * uToDimensions.x + kept.z * uToDimensions.x * uToDimensions.y;
+    targetCoordinate = coordinateFor(id, uToDimensions);
   } else {
     id = float((gl_VertexID * uIndexStride) % uToCount);
+    targetCoordinate = coordinateFor(id, uToDimensions);
   }
-  vec3 targetCoordinate = coordinateFor(id, uToDimensions);
   float targetAxis = axisValue(targetCoordinate, uAxis);
   float previousAxis = axisValue(uFromDimensions, uAxis);
   float copy = floor(targetAxis / previousAxis);
@@ -137,8 +151,27 @@ void main() {
   float projected = uPointDiameter * uViewportHeight / (2.0 * uTanHalfFov * -viewZ);
   float coverage = min(1.0, projected * projected);
   gl_PointSize = clamp(projected, 1.0, 52.0 * uDpr);
-  vAlpha = visible * uDensity * coverage;
+  vec3 blockLocal = mod(targetCoordinate, 10.0);
+  vec3 boundary = 1.0
+    - step(vec3(0.75), min(blockLocal, 9.0 - blockLocal));
+  float boundaryCount = boundary.x + boundary.y + boundary.z;
+  float face = step(0.5, boundaryCount);
+  float edge = step(1.5, boundaryCount);
+  // Dense states remain complete, but local volume boundaries carry the image.
+  // This turns a field of overlapping diagonals into nested 10 × 10 × 10
+  // structures without changing a point's position or size.
+  float structure = mix(0.012, 0.11, face);
+  structure = mix(structure, 0.88, edge);
+  // Sub-pixel edges disappear first on a phone. Boost only the structural
+  // hierarchy as projected points fall below one pixel; interiors still obey
+  // their true optical coverage and never turn back into a luminous mass.
+  float compactBoost = mix(3.4, 1.0, smoothstep(0.55, 1.25, projected));
+  structure *= compactBoost;
+  vAlpha = visible * uDensity * coverage * mix(1.0, structure, uDense);
   vFirst = id < 0.5 ? 1.0 : 0.0;
+  float blockOrigin = 1.0
+    - step(0.25, max(blockLocal.x, max(blockLocal.y, blockLocal.z)));
+  vGuide = uDense * blockOrigin * (1.0 - vFirst);
   vDepthLight = clamp(0.74 + point.z / max(18.0, uDistance) * 0.7, 0.35, 1.15);
 }`;
 
@@ -147,6 +180,7 @@ precision highp float;
 
 in float vAlpha;
 in float vFirst;
+in float vGuide;
 in float vDepthLight;
 out vec4 outColour;
 
@@ -162,8 +196,11 @@ void main() {
 
   vec3 ivory = vec3(0.84, 0.88, 0.9);
   vec3 amber = vec3(1.0, 0.55, 0.2);
-  vec3 colour = mix(ivory, amber, vFirst);
-  float alpha = min(1.0, vAlpha * edge * (vFirst > 0.5 ? 1.8 : 1.0));
+  vec3 guide = vec3(0.95, 0.69, 0.42);
+  vec3 colour = mix(ivory, guide, vGuide * 0.58);
+  colour = mix(colour, amber, vFirst);
+  float emphasis = vFirst > 0.5 ? 1.8 : mix(1.0, 1.35, vGuide);
+  float alpha = min(1.0, vAlpha * edge * emphasis);
   outColour = vec4(colour * light * vDepthLight, alpha);
 }`;
 
@@ -187,6 +224,7 @@ interface Uniforms {
   readonly toCount: WebGLUniformLocation;
   readonly indexStride: WebGLUniformLocation;
   readonly drawMode: WebGLUniformLocation;
+  readonly dense: WebGLUniformLocation;
 }
 
 export interface Parallax {
@@ -196,7 +234,7 @@ export interface Parallax {
 
 export interface LatticeRenderer {
   resize(width: number, height: number, dpr: number): void;
-  render(position: number, parallax?: Parallax): number;
+  render(position: number, parallax?: Parallax, inspection?: InspectionPose): number;
   dispose(): void;
 }
 
@@ -259,8 +297,8 @@ const fitDistance = (state: Lattice, aspect: number): number => {
 const densityFor = (count: number): number => {
   if (count <= 1_000) return 0.94;
   if (count <= 10_000) return 0.92;
-  if (count <= 100_000) return 0.62;
-  return 0.72;
+  if (count <= 100_000) return 0.9;
+  return 0.94;
 };
 
 function compile(gl: WebGL2RenderingContext, type: number, source: string): WebGLShader {
@@ -286,7 +324,7 @@ export function createLatticeRenderer(canvas: HTMLCanvasElement): LatticeRendere
   const gl = canvas.getContext("webgl2", {
     alpha: true,
     antialias: true,
-    depth: false,
+    depth: true,
     powerPreference: "high-performance",
     preserveDrawingBuffer: true,
     premultipliedAlpha: false,
@@ -330,6 +368,7 @@ export function createLatticeRenderer(canvas: HTMLCanvasElement): LatticeRendere
     toCount: uniform(gl, program, "uToCount"),
     indexStride: uniform(gl, program, "uIndexStride"),
     drawMode: uniform(gl, program, "uDrawMode"),
+    dense: uniform(gl, program, "uDense"),
   };
 
   let width = 1;
@@ -337,9 +376,8 @@ export function createLatticeRenderer(canvas: HTMLCanvasElement): LatticeRendere
   let dpr = 1;
   let lastFinishedPosition = -1;
 
-  gl.disable(gl.DEPTH_TEST);
   gl.enable(gl.BLEND);
-  gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+  gl.depthFunc(gl.LEQUAL);
   gl.clearColor(0, 0, 0, 0);
 
   return {
@@ -352,7 +390,11 @@ export function createLatticeRenderer(canvas: HTMLCanvasElement): LatticeRendere
       gl.viewport(0, 0, canvas.width, canvas.height);
     },
 
-    render(position, parallax = { yaw: 0, pitch: 0 }) {
+    render(
+      position,
+      parallax = { yaw: 0, pitch: 0 },
+      inspection = { amount: 0, drift: 0 },
+    ) {
       const upper = position <= 0 ? 0 : Math.ceil(position);
       const lower = Math.max(0, upper - 1);
       const progress = position <= 0 ? 1 : clamp(position - lower, 0, 1);
@@ -361,11 +403,39 @@ export function createLatticeRenderer(canvas: HTMLCanvasElement): LatticeRendere
       const to = LATTICES[upper];
       const settled = progress >= 1;
       const sampling = !settled && to.count > ANIMATED_POINT_BUDGET;
+      const dense = to.step >= 5;
+      const inspecting = settled && to.step >= 5 && inspection.amount > 0.001;
       const aspect = width / height;
       const fromDistance = fitDistance(from, aspect);
       const toDistance = fitDistance(to, aspect);
 
-      gl.clear(gl.COLOR_BUFFER_BIT);
+      const inspectYaw = to.step === 5 ? -0.1 : 0.16;
+      const inspectPitch = to.step === 5 ? -0.09 : 0.08;
+      const inspectZoom = to.step === 5 ? 0.54 : 0.48;
+      const inspectionAmount = settled ? inspection.amount : 0;
+      const yaw =
+        lerp(from.camera.yaw, to.camera.yaw, camera) +
+        parallax.yaw +
+        inspectionAmount * inspectYaw +
+        inspection.drift * 0.035;
+      const pitch =
+        lerp(from.camera.pitch, to.camera.pitch, camera) +
+        parallax.pitch +
+        inspectionAmount * inspectPitch -
+        inspection.drift * 0.025;
+      const baseDistance = Math.exp(
+        lerp(Math.log(fromDistance), Math.log(toDistance), camera),
+      );
+      const distance = baseDistance * lerp(1, inspectZoom, inspectionAmount);
+
+      if (dense) {
+        gl.enable(gl.DEPTH_TEST);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      } else {
+        gl.disable(gl.DEPTH_TEST);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+      }
+      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
       gl.useProgram(program);
       gl.bindVertexArray(vao);
       gl.uniform3fv(uniforms.fromDimensions, from.dimensions);
@@ -375,16 +445,16 @@ export function createLatticeRenderer(canvas: HTMLCanvasElement): LatticeRendere
       gl.uniform1f(uniforms.cameraProgress, camera);
       gl.uniform1f(
         uniforms.yaw,
-        lerp(from.camera.yaw, to.camera.yaw, camera) + parallax.yaw,
+        yaw,
       );
       gl.uniform1f(
         uniforms.pitch,
-        lerp(from.camera.pitch, to.camera.pitch, camera) + parallax.pitch,
+        pitch,
       );
       gl.uniform1f(uniforms.roll, lerp(from.camera.roll, to.camera.roll, camera));
       gl.uniform1f(
         uniforms.distance,
-        Math.exp(lerp(Math.log(fromDistance), Math.log(toDistance), camera)),
+        distance,
       );
       gl.uniform1f(uniforms.aspect, aspect);
       gl.uniform1f(uniforms.tanHalfFov, Math.tan(FOV / 2));
@@ -393,14 +463,26 @@ export function createLatticeRenderer(canvas: HTMLCanvasElement): LatticeRendere
       gl.uniform1f(uniforms.dpr, dpr);
       gl.uniform2f(
         uniforms.offset,
-        aspect > 1.2 ? 0.13 : 0,
-        aspect < 0.75 ? 0.08 : 0,
+        (aspect > 1.2 ? 0.13 : 0) - inspectionAmount * (aspect > 1.2 ? 0.055 : 0.015),
+        (aspect < 0.75 ? 0.08 : 0) + inspection.drift * 0.025,
       );
       gl.uniform1i(uniforms.toCount, to.count);
+      // The 10,000-point state uses the original luminous treatment. Fade the
+      // new block hierarchy in only as its camera pulls back, so entering
+      // 100,000 never makes the structure the visitor already had disappear.
+      const denseMix = dense ? (lower < 5 && !settled ? camera : 1) : 0;
+      gl.uniform1f(uniforms.dense, denseMix);
       const density = Math.exp(
         lerp(Math.log(densityFor(from.count)), Math.log(densityFor(to.count)), camera),
       );
-      if (sampling) {
+      if (inspecting && to.count === 1_000_000) {
+        gl.uniform1i(uniforms.drawMode, 3);
+        gl.uniform1i(uniforms.indexStride, 1);
+        // The point size remains invariant; only the moving inspection sample
+        // is sparse enough to keep the camera fluid.
+        gl.uniform1f(uniforms.density, 1);
+        gl.drawArrays(gl.POINTS, 0, 125_000);
+      } else if (sampling) {
         // Pass one: every point already on screen. Pass two: an even sample of
         // only the nine arriving copies. The total stays within the moving
         // budget, but the old state never dissolves to pay for the new one.
@@ -428,7 +510,6 @@ export function createLatticeRenderer(canvas: HTMLCanvasElement): LatticeRendere
         lastFinishedPosition = position;
       }
 
-      const distance = Math.exp(lerp(Math.log(fromDistance), Math.log(toDistance), camera));
       return (DOT_RADIUS * 2 * height) / (2 * Math.tan(FOV / 2) * distance);
     },
 

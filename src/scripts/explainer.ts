@@ -3,6 +3,7 @@
 // what a point, line, plane, and volume look like.
 
 import { LAST_STEP, MAGNITUDES, formatPixels } from "../lib/magnitudes";
+import { INSPECTION_START_STEP, inspectionPose, type InspectionPose } from "../lib/inspection";
 import { stepDuration } from "../lib/motion";
 import {
   createLatticeRenderer,
@@ -57,16 +58,54 @@ export function start(): void {
   let tweenStart = 0;
   let tweenLength = 0;
   let parallax: Parallax = { yaw: 0, pitch: 0 };
+  let inspection: InspectionPose = { amount: 0, drift: 0 };
+  let inspectionFrameId = 0;
+  let inspectionStarted = 0;
 
   const paint = (nextPosition: number): void => {
-    lastPointPixels = renderer?.render(nextPosition, parallax) ?? 0;
+    lastPointPixels = renderer?.render(nextPosition, parallax, inspection) ?? 0;
   };
 
   const syncMeasurement = (): void => {
     if (!measure) return;
     measure.textContent = renderer
-      ? `One point is ${formatPixels(lastPointPixels)} wide here.`
+      ? `${target >= INSPECTION_START_STEP ? "At full view, one" : "One"} point is ${formatPixels(lastPointPixels)} wide here.`
       : "The values still work; this browser cannot draw the 3D field.";
+  };
+
+  const stopInspection = (): void => {
+    if (inspectionFrameId !== 0) cancelAnimationFrame(inspectionFrameId);
+    inspectionFrameId = 0;
+    inspection = { amount: 0, drift: 0 };
+    root.dataset.view = "overview";
+  };
+
+  const inspect = (now: number): void => {
+    const next = inspectionPose(target, now - inspectionStarted, reduceMotion.matches);
+    const changed = next.amount !== inspection.amount || next.drift !== inspection.drift;
+    inspection = next;
+    root.dataset.view = inspection.amount > 0.04 ? "detail" : "overview";
+    // During each overview hold the pose is exactly zero. Keep the animation
+    // clock alive but do not redraw a million identical vertices every frame.
+    if (changed) {
+      paint(position);
+      if (inspection.amount === 0) syncMeasurement();
+    }
+    inspectionFrameId = requestAnimationFrame(inspect);
+  };
+
+  const startInspection = (): void => {
+    stopInspection();
+    if (
+      !renderer ||
+      reduceMotion.matches ||
+      target < INSPECTION_START_STEP ||
+      position !== target
+    ) {
+      return;
+    }
+    inspectionStarted = performance.now();
+    inspectionFrameId = requestAnimationFrame(inspect);
   };
 
   const syncText = (): void => {
@@ -104,12 +143,14 @@ export function start(): void {
       position = target;
       paint(position);
       syncMeasurement();
+      startInspection();
     }
   };
 
   const goTo = (requested: number, animate = true): void => {
     const wanted = clamp(Math.round(requested), 0, LAST_STEP);
     if (wanted === target && frameId === 0) return;
+    stopInspection();
     target = wanted;
     syncText();
 
@@ -119,6 +160,7 @@ export function start(): void {
       position = target;
       paint(position);
       syncMeasurement();
+      startInspection();
       return;
     }
 
@@ -136,7 +178,7 @@ export function start(): void {
     height = rect.height;
     renderer?.resize(width, height, window.devicePixelRatio || 1);
     paint(position);
-    if (frameId === 0) syncMeasurement();
+    if (frameId === 0 && inspectionFrameId === 0) syncMeasurement();
   };
 
   slider.addEventListener("input", () => goTo(Number(slider.value)));
@@ -190,6 +232,7 @@ export function start(): void {
 
   reduceMotion.addEventListener("change", () => {
     parallax = { yaw: 0, pitch: 0 };
+    stopInspection();
     if (reduceMotion.matches && frameId !== 0) {
       cancelAnimationFrame(frameId);
       frameId = 0;
@@ -197,9 +240,18 @@ export function start(): void {
       syncMeasurement();
     }
     paint(position);
+    syncMeasurement();
+    if (!reduceMotion.matches && frameId === 0) startInspection();
   });
 
-  window.addEventListener("pagehide", () => renderer?.dispose(), { once: true });
+  window.addEventListener(
+    "pagehide",
+    () => {
+      stopInspection();
+      renderer?.dispose();
+    },
+    { once: true },
+  );
 
   syncText();
   resize();
