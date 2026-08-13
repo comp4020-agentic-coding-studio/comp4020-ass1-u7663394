@@ -446,6 +446,7 @@ footer p {
 @media (width >= 62rem) {
   .explainer {
     grid-template-columns: minmax(0, 1fr) minmax(20rem, 26rem);
+
     /* The trailing 1fr matters: without it the drawing, which spans all three
        rows, stretches them and pushes the caption, the controls and the payoff
        apart into three floating islands. The spare height goes to a row nobody
