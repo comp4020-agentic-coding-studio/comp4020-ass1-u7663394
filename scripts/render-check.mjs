@@ -100,10 +100,17 @@ async function debuggerUrl() {
 function connect(url) {
   const socket = new WebSocket(url);
   const pending = new Map();
+  const listeners = new Map();
   let nextId = 0;
 
   socket.addEventListener("message", (event) => {
     const message = JSON.parse(event.data);
+    // Events carry a method and no id. Nothing was listening for these before,
+    // so a script that threw on load reported a perfectly clean run.
+    if (message.method) {
+      for (const listener of listeners.get(message.method) ?? []) listener(message.params);
+      return;
+    }
     const handler = pending.get(message.id);
     if (!handler) return;
     pending.delete(message.id);
@@ -118,6 +125,9 @@ function connect(url) {
 
   return {
     ready,
+    on(method, listener) {
+      listeners.set(method, [...(listeners.get(method) ?? []), listener]);
+    },
     send(method, params = {}, sessionId) {
       const id = (nextId += 1);
       return new Promise((resolve, reject) => {
@@ -248,6 +258,104 @@ async function probeInteraction(client, sessionId) {
   };
 }
 
+/* The artefact band is "holds up under use it wasn't designed for: the
+   keyboard, a resize mid-interaction, a slow connection", and the marker
+   "resizes mid-use and tabs through it". Both of those were things I had only
+   tried by hand, which is another way of saying they were untested. */
+
+async function pressKey(client, sessionId, key, code, vk) {
+  for (const type of ["rawKeyDown", "keyUp"]) {
+    await client.send(
+      "Input.dispatchKeyEvent",
+      {
+        type,
+        key,
+        code,
+        windowsVirtualKeyCode: vk,
+        nativeVirtualKeyCode: vk,
+      },
+      sessionId,
+    );
+  }
+}
+
+/**
+ * Can every marked control be reached by Tab alone, starting from the top of
+ * the document? A control that only a mouse can get to passes every other check
+ * in this file.
+ */
+async function probeKeyboardReach(client, sessionId) {
+  const total = Number(
+    await evaluate(
+      client,
+      sessionId,
+      `(() => {
+        document.querySelectorAll("[data-core-interaction]").forEach((el, i) => {
+          el.dataset.reachIndex = String(i);
+        });
+        document.body.focus();
+        window.scrollTo(0, 0);
+        return String(document.querySelectorAll("[data-core-interaction]").length);
+      })()`,
+    ),
+  );
+  if (total === 0) return { total: 0, reached: 0 };
+
+  const seen = new Set();
+  for (let press = 0; press < 40 && seen.size < total; press += 1) {
+    await pressKey(client, sessionId, "Tab", "Tab", 9);
+    const index = await evaluate(
+      client,
+      sessionId,
+      `JSON.stringify(document.activeElement?.dataset?.reachIndex ?? null)`,
+    );
+    if (index !== null) seen.add(index);
+  }
+  return { total, reached: seen.size };
+}
+
+/**
+ * Resize while the interaction is still in flight, then check the page again.
+ * A layout that only reflows correctly from a standing start is exactly the
+ * failure the marker's "resize mid-use" is looking for.
+ */
+async function probeResizeMidUse(client, sessionId, viewport) {
+  const narrow = Math.round(viewport.width * 0.55);
+  await evaluate(
+    client,
+    sessionId,
+    `(() => { document.querySelector("[data-core-interaction]")?.focus(); return "0"; })()`,
+  );
+  await pressKey(client, sessionId, "ArrowRight", "ArrowRight", 39);
+  await sleep(60); // mid-transition on purpose
+
+  await client.send(
+    "Emulation.setDeviceMetricsOverride",
+    {
+      width: narrow,
+      height: viewport.height,
+      deviceScaleFactor: 1,
+      mobile: viewport.mobile,
+    },
+    sessionId,
+  );
+  await sleep(900);
+
+  const probe = await evaluate(client, sessionId, probeSource(narrow));
+  await client.send(
+    "Emulation.setDeviceMetricsOverride",
+    {
+      width: viewport.width,
+      height: viewport.height,
+      deviceScaleFactor: 1,
+      mobile: viewport.mobile,
+    },
+    sessionId,
+  );
+  await sleep(400);
+  return { width: narrow, overflow: probe.overflow, offenders: probe.offenders };
+}
+
 const BASE = await readBase();
 const PAGES = await discoverPages();
 
@@ -266,6 +374,7 @@ const preview = spawn(
 
 let chrome;
 let failures = 0;
+let pageErrors = [];
 let interactionPages = 0;
 let interactionWorking = 0;
 
@@ -299,6 +408,16 @@ try {
   await client.send("Page.enable", {}, sessionId);
   await client.send("Runtime.enable", {}, sessionId);
 
+  // An uncaught exception leaves a page that looks fine in a screenshot and is
+  // dead to the visitor. Nothing here was listening for one.
+  client.on("Runtime.exceptionThrown", ({ exceptionDetails }) => {
+    pageErrors.push(
+      exceptionDetails?.exception?.description ??
+        exceptionDetails?.text ??
+        "unknown exception",
+    );
+  });
+
   if (shotsDir) await mkdir(shotsDir, { recursive: true });
 
   for (const viewport of VIEWPORTS) {
@@ -316,6 +435,7 @@ try {
       );
 
       const url = `${ORIGIN}${BASE}${page.path}`;
+      pageErrors = [];
       await client.send("Page.navigate", { url }, sessionId);
       await sleep(700);
 
@@ -371,6 +491,10 @@ try {
       // it -- a mouse-only control passes a click test and still fails the
       // artefact band.
       const core = await probeInteraction(client, sessionId);
+      const reach = await probeKeyboardReach(client, sessionId);
+      const resized = core.present
+        ? await probeResizeMidUse(client, sessionId, viewport)
+        : { width: viewport.width, overflow: 0, offenders: [] };
 
       // A page without the marked control isn't a failure -- an explainer may
       // have an about page. A *site* without one is, so that's asserted once at
@@ -384,7 +508,10 @@ try {
         probe.overflow === 0 &&
         probe.h1 === 1 &&
         hidden.value === 0 &&
-        (!core.present || (core.focused && core.changed));
+        (!core.present || (core.focused && core.changed)) &&
+        reach.reached === reach.total &&
+        resized.overflow === 0 &&
+        pageErrors.length === 0;
       if (!ok) failures += 1;
       const coreStatus = !core.present
         ? "n/a"
@@ -398,8 +525,24 @@ try {
           `doc ${String(probe.docWidth).padStart(5)}px  ` +
           `overflow ${String(probe.overflow).padStart(4)}px  ` +
           `h1 ${probe.h1}  unrevealed ${hidden.value}  ` +
-          `interaction ${coreStatus.padEnd(13)} height ${probe.height}px`,
+          `interaction ${coreStatus.padEnd(13)} ` +
+          `tab ${reach.reached}/${reach.total}  ` +
+          `resized@${resized.width} overflow ${resized.overflow}px  ` +
+          `height ${probe.height}px`,
       );
+      for (const error of pageErrors) {
+        console.log(`         uncaught: ${error.split("\n")[0]}`);
+      }
+      if (reach.reached !== reach.total) {
+        console.log(
+          `         ${reach.total - reach.reached} marked control(s) never got focus from Tab`,
+        );
+      }
+      for (const offender of resized.overflow > 0 ? resized.offenders : []) {
+        console.log(
+          `         overflows to ${offender.right}px after a mid-use resize: ${offender.selector}`,
+        );
+      }
       // Only when the document itself overflows. An element wider than the
       // viewport inside an `overflow: hidden` ancestor is a full-bleed
       // background doing its job, not a bug.
