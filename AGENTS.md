@@ -353,6 +353,10 @@ quantity derived from a thing must not also determine that thing.
   behind them, so fully populated cubes looked hollow. Dense states keep normal
   alpha blending and depth comparison but disable depth writes. Interior,
   face, and edge weights stay explicit and tested in `src/lib/layout.test.ts`.
+- **Dense stages may need different interior ink.** The shallower 100,000-point
+  plane needs stronger interior opacity than the million-point volume to make
+  each cube feel filled. The million keeps its established weight, and the
+  transition interpolates between them; geometry and point size never change.
 - **An overview is a beat, not a pause.** The dense states hold their complete
   overview for 500ms before travelling closer. That is enough to register the
   extent without losing momentum. Reduced motion remains at the overview, and

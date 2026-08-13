@@ -57,12 +57,13 @@ point stays fixed, while the faces and edges of each 1,000-point volume carry
 the structure. A later review found those blocks looked hollow: translucent
 front points were writing depth like an opaque shell and hiding every interior
 layer. Disabling dense-state depth writes and restoring a clear interior weight
-made the full quantity visible without losing the gaps. The overview now holds
-for 500ms rather than 1.8 seconds, so inspection begins while the transition
-still has momentum. The million overview remains exact and its moving close
-view keeps the stable `50×50×50` sample. `pnpm shots:inspection` captures both
-views at both marked sizes
-([`ec6d17d..85c27db`](https://github.com/comp4020-agentic-coding-studio/comp4020-ass1-u7663394/compare/ec6d17d..85c27db)).
+made the full quantity visible without losing the gaps. The shallower 100,000
+plane still needed more interior ink, so it now uses a stronger weight while
+the million remains unchanged; the transition interpolates between them. The
+overview holds for 500ms rather than 1.8 seconds, preserving momentum. The
+million overview remains exact and its close view keeps the stable `50×50×50`
+sample. `pnpm shots:inspection` captures both views at both marked sizes
+([`ec6d17d..1c04a72`](https://github.com/comp4020-agentic-coding-studio/comp4020-ass1-u7663394/compare/ec6d17d..1c04a72)).
 
 ## Where to look
 
