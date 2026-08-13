@@ -348,6 +348,15 @@ quantity derived from a thing must not also determine that thing.
   while the faces, edges, and origins of each 1,000-point volume carry the
   image. This makes the repeated unit legible without replacing a million with
   a decorative wireframe.
+- **Translucent points must not write an opaque shell.** Depth testing with
+  depth writes enabled made the nearest translucent points occlude every layer
+  behind them, so fully populated cubes looked hollow. Dense states keep normal
+  alpha blending and depth comparison but disable depth writes. Interior,
+  face, and edge weights stay explicit and tested in `src/lib/layout.test.ts`.
+- **An overview is a beat, not a pause.** The dense states hold their complete
+  overview for 500ms before travelling closer. That is enough to register the
+  extent without losing momentum. Reduced motion remains at the overview, and
+  the return leg is unchanged.
 
 ## The core interaction is marked in the markup
 

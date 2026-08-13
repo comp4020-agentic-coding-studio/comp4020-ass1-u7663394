@@ -52,13 +52,17 @@ sampling may reduce future detail; it may not erase the past
 At 100,000 and 1,000,000, additive points collapsed into interference patterns.
 A permanent close-up made individual blocks clear but concealed the total size;
 the fitted overview did the opposite. I separated those jobs. Each dense state
-now holds a complete overview, travels into the lattice over an 18-second path,
-then returns. Every point stays fixed, while interiors recede and the faces and
-edges of each 1,000-point volume carry the structure. The million overview is
-exact; its moving close view uses a stable `50×50×50` sample. Because normal
-screenshots request reduced motion, I added `pnpm shots:inspection` to capture
-the otherwise invisible close state at both marked viewports
-([`ec6d17d`](https://github.com/comp4020-agentic-coding-studio/comp4020-ass1-u7663394/commit/ec6d17d)).
+now holds a complete overview, travels into the lattice, then returns. Every
+point stays fixed, while the faces and edges of each 1,000-point volume carry
+the structure. A later review found those blocks looked hollow: translucent
+front points were writing depth like an opaque shell and hiding every interior
+layer. Disabling dense-state depth writes and restoring a clear interior weight
+made the full quantity visible without losing the gaps. The overview now holds
+for 500ms rather than 1.8 seconds, so inspection begins while the transition
+still has momentum. The million overview remains exact and its moving close
+view keeps the stable `50×50×50` sample. `pnpm shots:inspection` captures both
+views at both marked sizes
+([`ec6d17d..85c27db`](https://github.com/comp4020-agentic-coding-studio/comp4020-ass1-u7663394/compare/ec6d17d..85c27db)).
 
 ## Where to look
 
