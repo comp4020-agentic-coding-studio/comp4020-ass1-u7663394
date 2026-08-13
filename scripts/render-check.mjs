@@ -778,7 +778,7 @@ try {
               })()`,
             );
             // A six-step jump is capped at 2.6s; the overview then holds for
-            // 1.8s and approaches for 5.2s. Ten seconds reaches the close hold.
+            // 0.5s and approaches for 5.2s. Ten seconds reaches the close hold.
             await sleep(10_000);
             const { data } = await client.send(
               "Page.captureScreenshot",

@@ -16,7 +16,12 @@ describe("dense-lattice inspection camera", () => {
   it("shows the complete overview before moving closer", () => {
     expect(inspectionPose(5, 0).amount).toBe(0);
     expect(inspectionPose(6, INSPECTION_HOLD_MS - 1).amount).toBe(0);
-    expect(inspectionPose(5, 7_000).amount).toBe(1);
+    expect(inspectionPose(5, 5_700).amount).toBe(1);
+  });
+
+  it("keeps the overview beat short after the magnitude transition", () => {
+    expect(INSPECTION_HOLD_MS).toBeLessThanOrEqual(500);
+    expect(inspectionPose(5, 800).amount).toBeGreaterThan(0);
   });
 
   it("returns to the exact overview before the cycle repeats", () => {

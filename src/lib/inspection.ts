@@ -6,7 +6,8 @@
 
 export const INSPECTION_START_STEP = 5;
 export const INSPECTION_CYCLE_MS = 18_000;
-export const INSPECTION_HOLD_MS = 1_800;
+/** A brief overview beat before the camera continues into the structure. */
+export const INSPECTION_HOLD_MS = 500;
 
 export interface InspectionPose {
   /** 0 is the fitted overview; 1 is the closest inspection view. */
@@ -31,7 +32,7 @@ export function inspectionPose(
   if (step < INSPECTION_START_STEP || reducedMotion) return { amount: 0, drift: 0 };
 
   const time = Math.max(0, elapsedMs) % INSPECTION_CYCLE_MS;
-  const approachEnds = 7_000;
+  const approachEnds = 5_700;
   const returnStarts = 11_500;
   const returnEnds = 17_000;
 

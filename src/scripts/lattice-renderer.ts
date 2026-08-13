@@ -5,6 +5,9 @@ import { DOT_RADIUS, LATTICES, type Axis, type Lattice, type Vec3 } from "../lib
 const FOV = Math.PI / 4.2;
 const BLOCK_GAP = 2.4;
 export const ANIMATED_POINT_BUDGET = 120_000;
+export const DENSE_INTERIOR_WEIGHT = 0.32;
+export const DENSE_FACE_WEIGHT = 0.5;
+export const DENSE_EDGE_WEIGHT = 0.9;
 const SAMPLE_STRIDE = 7_919;
 
 const VERTEX_SHADER = `#version 300 es
@@ -160,8 +163,12 @@ void main() {
   // Dense states remain complete, but local volume boundaries carry the image.
   // This turns a field of overlapping diagonals into nested 10 × 10 × 10
   // structures without changing a point's position or size.
-  float structure = mix(0.012, 0.11, face);
-  structure = mix(structure, 0.88, edge);
+  float structure = mix(
+    ${DENSE_INTERIOR_WEIGHT.toFixed(2)},
+    ${DENSE_FACE_WEIGHT.toFixed(2)},
+    face
+  );
+  structure = mix(structure, ${DENSE_EDGE_WEIGHT.toFixed(2)}, edge);
   // Sub-pixel edges disappear first on a phone. Boost only the structural
   // hierarchy as projected points fall below one pixel; interiors still obey
   // their true optical coverage and never turn back into a luminous mass.
@@ -430,9 +437,16 @@ export function createLatticeRenderer(canvas: HTMLCanvasElement): LatticeRendere
 
       if (dense) {
         gl.enable(gl.DEPTH_TEST);
+        // These points are translucent. Writing their depth made the nearest
+        // layer behave like an opaque shell: every interior point behind it
+        // failed the depth test, so populated cubes looked hollow. Keep depth
+        // comparison for perspective, but let all translucent layers
+        // contribute to the volume.
+        gl.depthMask(false);
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
       } else {
         gl.disable(gl.DEPTH_TEST);
+        gl.depthMask(true);
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
       }
       gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);

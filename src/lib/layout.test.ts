@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   DOT_RADIUS,
@@ -11,7 +12,12 @@ import {
   sourceCoordinate,
   type Vec3,
 } from "./layout";
-import { ANIMATED_POINT_BUDGET } from "../scripts/lattice-renderer";
+import {
+  ANIMATED_POINT_BUDGET,
+  DENSE_EDGE_WEIGHT,
+  DENSE_FACE_WEIGHT,
+  DENSE_INTERIOR_WEIGHT,
+} from "../scripts/lattice-renderer";
 
 describe("the point is invariant", () => {
   it("has one spacing and one radius for every magnitude", () => {
@@ -101,5 +107,19 @@ describe("the moving frame budget", () => {
     expect(ANIMATED_POINT_BUDGET).toBeGreaterThanOrEqual(100_000);
     expect(ANIMATED_POINT_BUDGET).toBeLessThan(1_000_000);
     expect(ANIMATED_POINT_BUDGET - LATTICES[5].count).toBeGreaterThan(0);
+  });
+});
+
+describe("dense volume hierarchy", () => {
+  it("keeps interiors visible while faces and edges remain stronger", () => {
+    expect(DENSE_INTERIOR_WEIGHT).toBeGreaterThanOrEqual(0.15);
+    expect(DENSE_FACE_WEIGHT).toBeGreaterThan(DENSE_INTERIOR_WEIGHT);
+    expect(DENSE_EDGE_WEIGHT).toBeGreaterThan(DENSE_FACE_WEIGHT);
+    expect(DENSE_EDGE_WEIGHT).toBeLessThanOrEqual(1);
+  });
+
+  it("does not let translucent front points occlude the cube interior", () => {
+    const source = readFileSync("src/scripts/lattice-renderer.ts", "utf8");
+    expect(source).toContain("gl.depthMask(false)");
   });
 });
