@@ -68,18 +68,54 @@ async function discoverPages(dir = "dist", prefix = "") {
   return pages.sort((a, b) => a.path.localeCompare(b.path));
 }
 
-/** Wait for the preview server to actually answer, rather than sleeping. */
+/**
+ * Wait for the preview server to answer, and prove it is serving the build we
+ * just made.
+ *
+ * `astro preview` is a daemon. It survives `subprocess.kill()`, and a second
+ * `astro preview` does not start -- it prints "already running" and exits 0.
+ * So this script spent a whole day measuring a server started ten hours
+ * earlier, on whatever config it had then, and reporting success at it. That
+ * is the same failure as the crit-2 version assuming a server was already
+ * running, wearing a different hat: had `base` in astro.config.ts changed, the
+ * check would have passed against the old one.
+ *
+ * Answering is not enough, so this compares the bytes: the page the server
+ * hands back has to be the page in dist/. An identity check, not a threshold
+ * derived from the thing it measures.
+ */
 async function waitForServer(url) {
+  const built = await readFile("dist/index.html", "utf8");
   for (let attempt = 0; attempt < 60; attempt += 1) {
     try {
       const response = await fetch(url);
-      if (response.ok) return;
-    } catch {
+      if (response.ok) {
+        const served = await response.text();
+        if (served.trim() !== built.trim()) {
+          throw new Error(
+            `${url} is not serving this build.\n` +
+              `A stale \`astro preview\` daemon is the usual cause; ` +
+              `\`pnpm exec astro preview stop\` clears it.`,
+          );
+        }
+        return;
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("not serving")) throw error;
       /* not up yet */
     }
     await sleep(250);
   }
   throw new Error(`preview server never answered at ${url}`);
+}
+
+/** Stop any preview daemon, ours or a leftover, so each run owns its server. */
+function stopPreview() {
+  return new Promise((resolve) => {
+    const stop = spawn("pnpm", ["exec", "astro", "preview", "stop"], { stdio: "ignore" });
+    stop.on("exit", resolve);
+    stop.on("error", resolve);
+  });
 }
 
 /** Ask the browser for its debugger websocket, retrying while it boots. */
@@ -366,6 +402,9 @@ if (PAGES.length === 0) {
 
 console.log(`base ${BASE}  pages ${PAGES.length}  preview :${PREVIEW_PORT}`);
 
+// A leftover daemon would silently win the port and serve someone else's build.
+await stopPreview();
+
 const preview = spawn(
   "pnpm",
   ["exec", "astro", "preview", "--port", String(PREVIEW_PORT)],
@@ -645,6 +684,8 @@ try {
 } finally {
   chrome?.kill();
   preview.kill();
+  // kill() only reaches the CLI wrapper; the server it started is a daemon.
+  await stopPreview();
 }
 
 // Spec line 4 is a claim about the site, not about any one page.
