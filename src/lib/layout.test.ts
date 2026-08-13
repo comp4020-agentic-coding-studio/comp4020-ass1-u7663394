@@ -16,7 +16,9 @@ import {
   ANIMATED_POINT_BUDGET,
   DENSE_EDGE_WEIGHT,
   DENSE_FACE_WEIGHT,
-  DENSE_INTERIOR_WEIGHT,
+  DENSE_100K_INTERIOR_WEIGHT,
+  DENSE_MILLION_INTERIOR_WEIGHT,
+  denseInteriorWeight,
 } from "../scripts/lattice-renderer";
 
 describe("the point is invariant", () => {
@@ -111,11 +113,20 @@ describe("the moving frame budget", () => {
 });
 
 describe("dense volume hierarchy", () => {
-  it("keeps interiors visible while faces and edges remain stronger", () => {
-    expect(DENSE_INTERIOR_WEIGHT).toBeGreaterThanOrEqual(0.15);
-    expect(DENSE_FACE_WEIGHT).toBeGreaterThan(DENSE_INTERIOR_WEIGHT);
+  it("gives 100,000 more interior ink without overpowering its faces", () => {
+    expect(DENSE_100K_INTERIOR_WEIGHT).toBeGreaterThan(DENSE_MILLION_INTERIOR_WEIGHT);
+    expect(DENSE_100K_INTERIOR_WEIGHT).toBeGreaterThanOrEqual(0.4);
+    expect(DENSE_FACE_WEIGHT).toBeGreaterThan(DENSE_100K_INTERIOR_WEIGHT);
     expect(DENSE_EDGE_WEIGHT).toBeGreaterThan(DENSE_FACE_WEIGHT);
     expect(DENSE_EDGE_WEIGHT).toBeLessThanOrEqual(1);
+  });
+
+  it("keeps the million treatment unchanged and eases into it", () => {
+    expect(denseInteriorWeight(5, 5, 1)).toBe(DENSE_100K_INTERIOR_WEIGHT);
+    expect(denseInteriorWeight(5, 6, 0)).toBe(DENSE_100K_INTERIOR_WEIGHT);
+    expect(denseInteriorWeight(5, 6, 0.5)).toBeCloseTo(0.37);
+    expect(denseInteriorWeight(5, 6, 1)).toBe(DENSE_MILLION_INTERIOR_WEIGHT);
+    expect(denseInteriorWeight(6, 6, 1)).toBe(DENSE_MILLION_INTERIOR_WEIGHT);
   });
 
   it("does not let translucent front points occlude the cube interior", () => {

@@ -5,7 +5,8 @@ import { DOT_RADIUS, LATTICES, type Axis, type Lattice, type Vec3 } from "../lib
 const FOV = Math.PI / 4.2;
 const BLOCK_GAP = 2.4;
 export const ANIMATED_POINT_BUDGET = 120_000;
-export const DENSE_INTERIOR_WEIGHT = 0.32;
+export const DENSE_100K_INTERIOR_WEIGHT = 0.42;
+export const DENSE_MILLION_INTERIOR_WEIGHT = 0.32;
 export const DENSE_FACE_WEIGHT = 0.5;
 export const DENSE_EDGE_WEIGHT = 0.9;
 const SAMPLE_STRIDE = 7_919;
@@ -34,6 +35,7 @@ uniform int uToCount;
 uniform int uIndexStride;
 uniform int uDrawMode;
 uniform float uDense;
+uniform float uInteriorWeight;
 
 out float vAlpha;
 out float vFirst;
@@ -164,7 +166,7 @@ void main() {
   // This turns a field of overlapping diagonals into nested 10 × 10 × 10
   // structures without changing a point's position or size.
   float structure = mix(
-    ${DENSE_INTERIOR_WEIGHT.toFixed(2)},
+    uInteriorWeight,
     ${DENSE_FACE_WEIGHT.toFixed(2)},
     face
   );
@@ -232,6 +234,7 @@ interface Uniforms {
   readonly indexStride: WebGLUniformLocation;
   readonly drawMode: WebGLUniformLocation;
   readonly dense: WebGLUniformLocation;
+  readonly interiorWeight: WebGLUniformLocation;
 }
 
 export interface Parallax {
@@ -249,6 +252,28 @@ const clamp = (value: number, low: number, high: number): number =>
   Math.min(high, Math.max(low, value));
 
 const lerp = (from: number, to: number, t: number): number => from + (to - from) * t;
+
+/**
+ * The 100,000-point plane has fewer overlapping depth layers than the million
+ * and needs a little more interior ink to read as ten filled volumes. The
+ * million keeps its existing treatment; the transition eases between the two
+ * weights so the shared points do not flicker as the last axis expands.
+ */
+export const denseInteriorWeight = (
+  fromStep: number,
+  toStep: number,
+  progress: number,
+): number => {
+  if (toStep === 5) return DENSE_100K_INTERIOR_WEIGHT;
+  if (fromStep === 5 && toStep === 6) {
+    return lerp(
+      DENSE_100K_INTERIOR_WEIGHT,
+      DENSE_MILLION_INTERIOR_WEIGHT,
+      clamp(progress, 0, 1),
+    );
+  }
+  return DENSE_MILLION_INTERIOR_WEIGHT;
+};
 
 const worldSize = (dimensions: Vec3): Vec3 =>
   dimensions.map((length) => length + Math.floor((length - 1) / 10) * BLOCK_GAP) as [
@@ -376,6 +401,7 @@ export function createLatticeRenderer(canvas: HTMLCanvasElement): LatticeRendere
     indexStride: uniform(gl, program, "uIndexStride"),
     drawMode: uniform(gl, program, "uDrawMode"),
     dense: uniform(gl, program, "uDense"),
+    interiorWeight: uniform(gl, program, "uInteriorWeight"),
   };
 
   let width = 1;
@@ -486,6 +512,7 @@ export function createLatticeRenderer(canvas: HTMLCanvasElement): LatticeRendere
       // 100,000 never makes the structure the visitor already had disappear.
       const denseMix = dense ? (lower < 5 && !settled ? camera : 1) : 0;
       gl.uniform1f(uniforms.dense, denseMix);
+      gl.uniform1f(uniforms.interiorWeight, denseInteriorWeight(lower, upper, camera));
       const density = Math.exp(
         lerp(Math.log(densityFor(from.count)), Math.log(densityFor(to.count)), camera),
       );
