@@ -192,15 +192,16 @@ says about the developer you're becoming.
 
 # This prototype: an interactive explainer (A1)
 
-**How big is a million?** One dot is one. The visitor moves along a scale of
+**How big is a million?** One point is one. The visitor moves along a scale of
 powers of ten from 1 to 1,000,000 — with a range slider, two buttons, or ←/→
-anywhere on the page — and each step multiplies the dots by ten. The rule the
-page never breaks is the argument: **the dot never changes size.** Only the
-camera moves back. So a step is not a bigger number in a bigger font; it is ten
-copies of the thing you were just looking at, seen from ten times further away.
-By 1,000,000 the first dot is still there, still the same size, and you cannot
-see it. The point of view is the gap between how easily you read "1,000,000" and
-how completely the quantity has escaped you.
+anywhere on the page — and each step multiplies the lattice by ten. Its spatial
+grammar is exact: `1×1×1 → 10×1×1 → 10×10×1 → 10×10×10`, then the same three
+moves repeat at the scale of whole 1,000-point cubes until `100×100×100`. The
+rule the page never breaks is the argument: **the point never changes size.** A
+step is ten copies of the structure the visitor was just looking at, separated
+along one new axis. By 1,000,000 the first point is still there and the quantity
+has become a luminous volume. The point of view is the gap between how easily
+you read "1,000,000" and how completely the quantity has escaped you.
 
 The core interaction, stated so `spec/assignment-1.test.ts` and
 `pnpm check:render` can both hold it: **operating any marked control moves the
@@ -215,11 +216,12 @@ Two rules this idea adds to the ones below, both load-bearing:
   `src/lib/layout.test.ts` asserts the nesting holds exactly ten of the previous
   block with child 0 at the origin. If that stops being true the page is still
   pretty and no longer says anything.
-- **Below one pixel, fill at the true coverage.** A million dots cannot be drawn
-  as dots. Each block is filled at exactly the fraction of its area the dots
-  occupy, which is the same average brightness they would have made. That the
-  screen runs out before the number does is the point, so faking it would be a
-  strange thing to do.
+- **Below one pixel, preserve coverage.** The WebGL point sprite clamps to one
+  device pixel because a display cannot emit less, then multiplies opacity by
+  the square of the point's projected size. The settled final state still draws
+  exactly one million vertices. During motion only, a deterministic sample is
+  spread through the future copies so the frame rate survives; see the motion
+  rule below.
 
 The rules below are not style preferences. Each one is here because something
 went wrong, and the note says what. They were earned in C1 and C2 and carried
@@ -321,6 +323,18 @@ quantity derived from a thing must not also determine that thing.
   settled states. Capturing frames at fixed offsets mid-step is how the two
   beats were checked; `src/lib/motion.test.ts` holds the ends and the order so
   a settled magnitude can never differ from the last frame of the step into it.
+- **Never ease the timeline twice.** The first 3D pass eased the journey across
+  the scale and then applied the camera/copy curves inside each step. A contact
+  sheet showed the result: the volume was mostly present before the plane had
+  time to register. Position now advances linearly; the dimensional
+  choreography owns the easing once. `spec/explainer.test.ts` holds that.
+- **A performance sample may omit the future; it may not erase the past.** A
+  million vertices every moving frame measured 5fps under software WebGL. The
+  first sampled version reached 28–34fps but spread the sample across all ten
+  copies, thinning the 100,000 points already on screen. The accepted renderer
+  is two passes: every old point, then a deterministic sample of the nine
+  arriving copies, with the exact million drawn once on settle. Visual
+  continuity is part of correctness, not polish to trade for a benchmark.
 
 ## The core interaction is marked in the markup
 

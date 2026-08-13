@@ -2,35 +2,42 @@
 
 ## The breakthrough
 
-The first version of this idea in my head was "each step makes the number
-bigger". I sketched it and it was empty: a `1,000` in a larger font teaches
-nothing, because scaling the *notation* is not scaling the *quantity*. The
-breakthrough was inverting which thing is allowed to move. Fix the dot — one
-dot, one size, forever — and move the camera instead. Suddenly every step means
-something you can check with your eyes: those are the same dots, there are ten
-times as many, and you are further away. The explanation stopped being narration
+The first version of this idea in my head was “each step makes the number
+bigger”. I sketched it and it was empty: a `1,000` in a larger font teaches
+nothing, because scaling the notation is not scaling the quantity. The
+breakthrough was giving each multiplication a spatial consequence. Fix the
+point — one point, one size, forever — then let ten points become a line, ten
+lines become a plane, and ten planes become a volume. After that, the same three
+moves repeat at the scale of whole thousand-point cubes.
+
+Suddenly every step means something I can check with my eyes: the previous form
+is still there, nine copies arrive along a new axis, and the camera retreats only
+far enough to keep the result in view. The explanation stopped being narration
 over a picture and became the picture.
 
-What made it stick was writing the invariant down where code has to obey it.
-`DOT_RADIUS` takes no magnitude argument, so there is no place a per-step size
-could enter, and a test asserts every block holds exactly ten of the last one. I
-have never before turned the *idea* of a piece of work into an assertion. It is
-the thing I would do again first.
+What made it stick was writing that invariant down where code has to obey it.
+`DOT_RADIUS` takes no magnitude argument, so there is nowhere a per-step size
+could enter. The lattice dimensions and tests assert that every state has
+exactly ten times the points of the last and changes only one axis. I have never
+before turned the idea of a piece of work into an assertion. It is the thing I
+would do again first.
 
 ## What it changed
 
-Halfway through, I found that my render sensor had spent the day measuring a
-preview server started ten hours earlier — it answered, so I believed it. My
-`CLAUDE.md` already warned about pointing a sensor at the wrong server, and I
-had still been fooled, because the old rule only asked whether the server was
-*alive*. The new one asks whether it is serving my build, byte for byte.
+Halfway through, I found that a correct endpoint could hide an incorrect
+transition. Fixed-time motion frames showed I had eased the journey twice, so
+the new volume appeared before the old plane had time to register. Removing the
+outer easing restored the intended two beats: camera first, copies second.
 
-Later, a layout change squeezed the drawing off the side of a phone and left the
-stage blank while every check stayed green — a canvas is opaque to all of them. I
-had to open the screenshots to notice, and looking is not a sensor.
+The million-point step exposed a second trap. Drawing every point on every frame
+fell to 5fps in software WebGL. Sampling made it fast, but my first sample erased
+most of the previous 100,000-point plane. The final transition keeps every old
+point and samples only what is arriving, then renders the exact million once it
+settles. That distinction — optimise the future without falsifying the past —
+is now a rule in `AGENTS.md`.
 
 I want to be the kind of developer who is suspicious of green. Not of failure —
 failure announces itself — but of a check that has never been watched going red.
-Every sensor I added this week, I broke on purpose first, and the ones that
-mattered most were the ones covering the part of the artefact nothing else could
-see.
+The most important sensor I added copies the WebGL canvas into a surface it can
+sample, because a green DOM check cannot tell me whether the main artefact
+contains a picture at all.
