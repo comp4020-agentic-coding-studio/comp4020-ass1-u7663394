@@ -5,9 +5,9 @@ import { DOT_RADIUS, LATTICES, type Axis, type Lattice, type Vec3 } from "../lib
 const FOV = Math.PI / 4.2;
 const BLOCK_GAP = 2.4;
 export const ANIMATED_POINT_BUDGET = 120_000;
-export const DENSE_100K_INTERIOR_WEIGHT = 0.42;
-export const DENSE_MILLION_INTERIOR_WEIGHT = 0.32;
-export const DENSE_FACE_WEIGHT = 0.5;
+export const DENSE_100K_INTERIOR_WEIGHT = 0.75;
+export const DENSE_MILLION_INTERIOR_WEIGHT = 0.75;
+export const DENSE_FACE_WEIGHT = 0.6;
 export const DENSE_EDGE_WEIGHT = 0.9;
 const SAMPLE_STRIDE = 7_919;
 
