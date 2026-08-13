@@ -181,6 +181,18 @@ h1 {
   order: 3;
 }
 
+.stage-noscript {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  margin: 0;
+  padding: 2rem;
+  text-align: center;
+  text-wrap: balance;
+  color: var(--ink-dim);
+}
+
 .stage-canvas {
   display: block;
   width: 100%;

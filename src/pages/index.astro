@@ -34,6 +34,15 @@ import { MAGNITUDES } from "../lib/magnitudes";
             data-canvas
             role="img"
             aria-label={MAGNITUDES[0].aria}></canvas>
+          <noscript>
+            {/* The canvas is supported but never painted when script is off,
+                so it is a blank box with nothing to say for itself. The seven
+                magnitudes below are all still there. */}
+            <p class="stage-noscript">
+              The drawing needs JavaScript. Every magnitude it would have drawn
+              is written out below.
+            </p>
+          </noscript>
         </div>
 
         <figcaption class="stage-caption">
