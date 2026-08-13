@@ -58,6 +58,8 @@ export interface Magnitude {
   readonly name: string;
   /** The line that does the explaining at this magnitude. */
   readonly note: string;
+  /** The spatial form the lattice has reached. */
+  readonly shape: string;
   /** Counting time, derived. */
   readonly counting: string;
   /** What a screen reader is told the drawing currently shows. */
@@ -75,13 +77,23 @@ const NAMES = [
 ] as const;
 
 const NOTES = [
-  "One dot. This is its size, and it will not change again.",
-  "Ten. You saw that without counting. That stops here.",
-  "One hundred. Countable, if someone made you. Nobody will.",
-  "One thousand. Ten of the block you were just looking at.",
-  "Ten thousand. You are reading texture now, not quantity.",
-  "One hundred thousand. The first dot is still there, marked.",
-  "One million. Four syllables. A hundred of the last screen.",
+  "One point. Keep your eye on it.",
+  "Ten points make a line.",
+  "Ten lines make a surface.",
+  "Ten surfaces make a volume.",
+  "Now the whole volume is copied ten times.",
+  "Ten rows become a wall.",
+  "The first point is still in there.",
+] as const;
+
+const SHAPES = [
+  "point",
+  "line",
+  "plane",
+  "volume",
+  "ten volumes",
+  "a plane of volumes",
+  "a volume of volumes",
 ] as const;
 
 export const MAGNITUDES: readonly Magnitude[] = NAMES.map((name, step) => {
@@ -92,6 +104,7 @@ export const MAGNITUDES: readonly Magnitude[] = NAMES.map((name, step) => {
     numeral: NUMBER.format(value),
     name,
     note: NOTES[step],
+    shape: SHAPES[step],
     counting: countingTime(value),
     aria:
       `${NUMBER.format(value)} dots, drawn at the same size as the first one, ` +

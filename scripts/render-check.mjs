@@ -284,7 +284,11 @@ async function probeInteraction(client, sessionId) {
     );
     await sleep(150);
   }
-  await sleep(300);
+  // The spatial transition is intentionally two beats and can be interrupted
+  // by the second trusted arrow above. Inspect the state after it has settled;
+  // sampling the drawing buffer between the camera move and the copy arrival
+  // produced a real screenshot but an empty composited canvas on SwiftShader.
+  await sleep(2200);
 
   const after = await evaluate(client, sessionId, readOutput);
   return {
@@ -371,12 +375,27 @@ async function probeCanvasInk(client, sessionId) {
       let lit = 0;
       let total = 0;
       for (const canvas of canvases) {
-        const context = canvas.getContext("2d");
-        if (!context || canvas.width === 0) continue;
-        const { data, width, height } = context.getImageData(0, 0, canvas.width, canvas.height);
+        if (canvas.width === 0) continue;
+        const width = canvas.width;
+        const height = canvas.height;
+        // Copy the browser's composited canvas into a throwaway 2D surface.
+        // Direct readPixels() proved driver-dependent under software WebGL:
+        // SwiftShader returned an empty back buffer on the wide viewport even
+        // though the same frame was visibly present in Page.captureScreenshot.
+        const sample = document.createElement("canvas");
+        sample.width = width;
+        sample.height = height;
+        const context = sample.getContext("2d");
+        if (!context) continue;
+        context.drawImage(canvas, 0, 0);
+        const data = context.getImageData(0, 0, width, height).data;
         const at = (x, y) => (y * width + x) * 4;
         const base = at(0, 0);
-        const step = Math.max(1, Math.floor(Math.min(width, height) / 220));
+        // Sparse 3D states can contain only one point. Sample every pixel: a
+        // stride can step over the picture entirely and call a visible canvas
+        // blank. This is one read of at most the marked desktop viewport, not a
+        // frame loop.
+        const step = 1;
         for (let y = 0; y < height; y += step) {
           for (let x = 0; x < width; x += step) {
             const i = at(x, y);
@@ -392,6 +411,7 @@ async function probeCanvasInk(client, sessionId) {
       }
       return JSON.stringify({
         present: true,
+        pixels: lit,
         ink: total === 0 ? 0 : Math.round((lit / total) * 10000) / 10000,
       });
     })()`,
@@ -472,7 +492,11 @@ try {
     CHROME,
     [
       "--headless=new",
-      "--disable-gpu",
+      // The artefact is WebGL. Headless Chrome has no hardware GPU, so ask
+      // ANGLE for its software implementation explicitly rather than silently
+      // testing the fallback copy and calling that a render check.
+      "--use-angle=swiftshader",
+      "--enable-unsafe-swiftshader",
       "--hide-scrollbars",
       "--no-first-run",
       "--no-default-browser-check",
@@ -600,7 +624,7 @@ try {
         reach.reached === reach.total &&
         resized.overflow === 0 &&
         pageErrors.length === 0 &&
-        (!ink.present || ink.ink >= 0.002);
+        (!ink.present || ink.pixels >= 3);
       if (!ok) failures += 1;
       const coreStatus = !core.present
         ? "n/a"
@@ -616,14 +640,14 @@ try {
           `h1 ${probe.h1}  unrevealed ${hidden.value}  ` +
           `interaction ${coreStatus.padEnd(13)} ` +
           `tab ${reach.reached}/${reach.total}  ` +
-          `ink ${ink.present ? `${(ink.ink * 100).toFixed(1)}%` : "n/a"}  ` +
+          `ink ${ink.present ? `${(ink.ink * 100).toFixed(1)}%/${ink.pixels}px` : "n/a"}  ` +
           `resized@${resized.width} overflow ${resized.overflow}px  ` +
           `height ${probe.height}px`,
       );
       for (const error of pageErrors) {
         console.log(`         uncaught: ${error.split("\n")[0]}`);
       }
-      if (ink.present && ink.ink < 0.002) {
+      if (ink.present && ink.pixels < 3) {
         console.log(
           "         the canvas is blank — the drawing is not reaching the screen",
         );

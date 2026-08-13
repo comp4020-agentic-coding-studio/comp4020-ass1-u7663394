@@ -53,9 +53,12 @@ describe("the seven magnitudes", () => {
     expect(MAGNITUDES[3].numeral).toBe("1,000");
   });
 
-  it("each say something, rather than only naming the number", () => {
+  it("each says something specific without turning into interface prose", () => {
     for (const magnitude of MAGNITUDES) {
-      expect(magnitude.note.length, `step ${magnitude.step} has no note`).toBeGreaterThan(40);
+      expect(magnitude.note.length, `step ${magnitude.step} has no note`).toBeGreaterThan(15);
+      expect(magnitude.note.length, `step ${magnitude.step} is too wordy`).toBeLessThan(58);
+      expect(magnitude.note.toLowerCase()).not.toMatch(/explore|discover|journey|experience/);
+      expect(magnitude.shape.length).toBeGreaterThan(2);
     }
   });
 });

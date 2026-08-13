@@ -1,27 +1,15 @@
-/* How big is a million?
- *
- * One screen. The drawing is the page and the words are a thin layer over it —
- * a title, one number, two short lines, one control. Minimal on purpose, and
- * the discipline is the same as the drawing's: if it doesn't serve *this dot,
- * multiplied by ten*, it isn't here.
- *
- * Rules carried forward from earlier weeks, each earned:
- *   - auto-fit tracks are always minmax(min(<size>, 100%), 1fr); a bare
- *     minmax(26rem, 1fr) cannot shrink below 26rem and overflowed a 390px phone
- *   - class names are kebab-case, because stylelint-config-standard says so and
- *     my preference for BEM is not a reason to loosen a rule
- *   - nothing is hidden unless [data-js] says script has arrived
- */
-
 :root {
-  --ink: #f7f1e6;
-  --ink-dim: #9d968b;
-  --ink-faint: #6a655d;
-  --bg: #07080b;
-  --line: #23252e;
-  --accent: #ff9f45;
-  --focus: #7cc4ff;
-  --pad: clamp(1.15rem, 3.5vw, 2.75rem);
+  --ink: #f4f1ea;
+  --ink-soft: #b6b1a8;
+  --ink-faint: #75736f;
+  --bg: #07080a;
+  --line: rgb(244 241 234 / 14%);
+  --line-strong: rgb(244 241 234 / 28%);
+  --accent: #df8245;
+  --focus: #f0ad78;
+  --pad: clamp(1.15rem, 3vw, 2.5rem);
+  --font-sans: "Avenir Next", avenir, "Segoe UI", sans-serif;
+  --font-number: "SFMono-Regular", "Roboto Mono", consolas, monospace;
 
   color-scheme: dark;
 }
@@ -33,17 +21,19 @@
 }
 
 html {
+  background: var(--bg);
   text-size-adjust: 100%;
+  scroll-behavior: smooth;
 }
 
 body {
+  min-height: 100dvh;
   margin: 0;
   background: var(--bg);
   color: var(--ink);
-  font-family: system-ui, -apple-system, "Segoe UI", roboto, sans-serif;
-  font-size: clamp(0.95rem, 0.9rem + 0.25vw, 1.02rem);
-  line-height: 1.55;
-  min-height: 100svh;
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.5;
 }
 
 [hidden] {
@@ -51,23 +41,26 @@ body {
 }
 
 .skip {
-  position: absolute;
-  left: -9999px;
-  top: 0;
+  position: fixed;
+  top: 0.75rem;
+  left: 0.75rem;
   z-index: 10;
-  padding: 0.6rem 1rem;
-  background: var(--accent);
-  color: #14161f;
+  padding: 0.55rem 0.75rem;
+  background: var(--ink);
+  color: var(--bg);
+  font-size: 0.8rem;
   font-weight: 600;
+  text-decoration: none;
+  transform: translateY(-200%);
 }
 
 .skip:focus {
-  left: 0;
+  transform: translateY(0);
 }
 
 :focus-visible {
   outline: 2px solid var(--focus);
-  outline-offset: 3px;
+  outline-offset: 4px;
 }
 
 .sr-only {
@@ -81,56 +74,37 @@ body {
   white-space: nowrap;
 }
 
-/* ------------------------------------------------------------------ the one
-   screen. Without script this is ordinary document flow; the overlay layout
-   below is gated on [data-js], so a reader who never gets the script gets a
-   plain, complete page instead of a pile of absolutely-positioned text. */
+/* Without script this is an ordinary document: a modest frame followed by all
+   seven magnitudes. The immersive overlay only exists after script has proved
+   it can run. */
 
-.hero {
+.experience {
   padding: var(--pad);
 }
 
 .masthead {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.4rem 1.5rem;
   align-items: baseline;
   justify-content: space-between;
+  gap: 0.4rem 1rem;
 }
 
 h1 {
   margin: 0;
-  font-size: 0.78rem;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--ink-dim);
-}
-
-.masthead nav a {
   font-size: 0.72rem;
-  letter-spacing: 0.12em;
+  font-weight: 600;
+  letter-spacing: 0.13em;
   text-transform: uppercase;
-  color: var(--ink-faint);
-  text-decoration: none;
-}
-
-.masthead nav a:hover,
-.masthead nav a:focus-visible {
-  color: var(--ink);
-}
-
-/* --------------------------------------------------------------- the drawing */
-
-.stage {
-  display: contents;
 }
 
 .stage-frame {
   position: relative;
-  height: clamp(14rem, 46svh, 24rem);
+  height: clamp(18rem, 48dvh, 30rem);
   margin-block: 1.5rem;
-  background: var(--bg);
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 62% 42%, #1a1c21 0, #0c0e11 42%, var(--bg) 78%);
 }
 
 .stage-canvas {
@@ -139,353 +113,405 @@ h1 {
   height: 100%;
 }
 
-.stage-noscript {
+.render-fallback {
   position: absolute;
   inset: 0;
   display: grid;
   place-content: center;
-  margin: 0;
+  max-width: 34ch;
+  margin: auto;
   padding: 2rem;
+  color: var(--ink-soft);
   text-align: center;
   text-wrap: balance;
-  color: var(--ink-dim);
 }
 
-/* --------------------------------------------------------------- the readout */
+.scene-status {
+  display: flex;
+  gap: 0.7rem;
+  color: var(--ink-faint);
+  font-family: var(--font-number);
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
 
-.readout {
-  min-width: 0;
+.scene-status-shape {
+  color: var(--accent);
 }
 
 .magnitudes {
-  margin: 0;
   padding: 0;
+  margin: 1.5rem 0 0;
   list-style: none;
+}
+
+.magnitude + .magnitude {
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--line);
+}
+
+.magnitude-figure,
+.magnitude-note,
+.magnitude-counting,
+.readout-measure,
+.payoff {
+  margin: 0;
 }
 
 .magnitude-figure {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: 0 0.7rem;
-  margin: 0;
+  gap: 0.3rem 0.85rem;
 }
 
 .magnitude-numeral {
-  font-size: clamp(2.6rem, 1.1rem + 6.4vw, 5.5rem);
-  font-weight: 700;
-  line-height: 0.94;
-  letter-spacing: -0.045em;
+  font-family: var(--font-number);
+  font-size: clamp(3rem, 10vw, 6.8rem);
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
+  letter-spacing: -0.075em;
+  line-height: 0.88;
 }
 
 .magnitude-name {
-  font-size: 0.72rem;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
   color: var(--accent);
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
 }
 
-/* The three text lines below the numeral reserve their own height.
-   That is not a nicety: the measured dot size is read off the render, the
-   render is fitted to whatever space the readout leaves, and on a phone the
-   readout sits along the bottom edge. Letting the figure's own wrapping change
-   the readout's height closed that circle, and the page reflowed forever.
-   Reserved height breaks it — and it also stops the drawing resizing every
-   time a caption happens to be a line longer. */
 .magnitude-note {
-  margin: 0.5rem 0 0;
-  min-height: 3.1em;
-  max-width: 30ch;
-  color: var(--ink-dim);
+  max-width: 31ch;
+  margin-top: 0.75rem;
+  color: var(--ink-soft);
+  font-size: clamp(0.9rem, 0.86rem + 0.2vw, 1.02rem);
   text-wrap: pretty;
 }
 
 .magnitude-counting,
 .readout-measure {
-  margin: 0.3rem 0 0;
-  min-height: 3.1em;
-  max-width: 34ch;
-  font-size: 0.74rem;
-  letter-spacing: 0.01em;
+  margin-top: 0.3rem;
   color: var(--ink-faint);
+  font-family: var(--font-number);
+  font-size: 0.65rem;
+  letter-spacing: 0.01em;
 }
 
-.readout-measure {
-  min-height: 1.55em;
+.payoff {
+  max-width: 32ch;
+  margin-top: 1.25rem;
+  color: var(--ink-soft);
 }
-
-.magnitude + .magnitude {
-  margin-top: 1.6rem;
-  padding-top: 1.6rem;
-  border-top: 1px solid var(--line);
-}
-
-/* --------------------------------------------------------------- the control */
 
 .dock {
-  margin-top: 2rem;
-  min-width: 0;
-}
-
-.dock-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.6rem 1rem;
-  margin-top: 0.75rem;
-  min-width: 0;
-}
-
-.dock-nudges {
-  display: flex;
-  gap: 0.5rem;
+  max-width: 34rem;
+  margin-top: 2.5rem;
 }
 
 .dock-slider {
   display: block;
   width: 100%;
+  height: 1rem;
   margin: 0;
   accent-color: var(--accent);
   cursor: pointer;
 }
 
-.dock-marks {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.2rem;
-  padding: 0 0.25rem;
-  margin: 0.3rem 0 0;
-  list-style: none;
-  font-size: 0.62rem;
-  letter-spacing: 0.06em;
+.dock-scale {
+  display: grid;
+  grid-template-columns: auto repeat(7, 1fr) auto;
+  align-items: center;
+  gap: 0;
+  margin-top: 0.25rem;
   color: var(--ink-faint);
-  font-variant-numeric: tabular-nums;
+  font-family: var(--font-number);
+  font-size: 0.58rem;
 }
 
-.dock-marks li {
-  min-width: 0;
+.dock-scale i {
+  justify-self: center;
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background: var(--line-strong);
+}
+
+.dock-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 0.6rem;
+}
+
+.dock-hint {
+  margin: 0;
+  color: var(--ink-faint);
+  font-size: 0.65rem;
+}
+
+kbd {
+  font: inherit;
+  color: var(--ink-soft);
+}
+
+.dock-nudges {
+  display: flex;
+  gap: 0.4rem;
 }
 
 .nudge {
-  flex: 0 0 auto;
   display: grid;
   place-content: center;
-  width: 2.5rem;
-  height: 2.5rem;
+  width: 2.65rem;
+  height: 2.65rem;
   padding: 0;
   border: 1px solid var(--line);
   border-radius: 50%;
-  background: transparent;
+  background: rgb(7 8 10 / 55%);
   color: var(--ink);
   font: inherit;
-  font-size: 1rem;
   cursor: pointer;
-  transition: border-color 200ms ease, color 200ms ease;
+  backdrop-filter: blur(10px);
+  transition:
+    color 180ms ease,
+    border-color 180ms ease,
+    background-color 180ms ease,
+    transform 180ms ease;
 }
 
 .nudge:disabled {
   color: var(--ink-faint);
   cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .nudge:hover:not(:disabled) {
-  border-color: var(--accent);
+  border-color: var(--line-strong);
+  background: rgb(244 241 234 / 8%);
   color: var(--accent);
 }
 
-.dock-hint {
-  margin: 0;
-  font-size: 0.7rem;
-  letter-spacing: 0.02em;
-  color: var(--ink-faint);
+.nudge:active:not(:disabled) {
+  transform: scale(0.94);
 }
 
-kbd {
-  padding: 0.05em 0.3em;
-  border: 1px solid var(--line);
-  border-radius: 0.25rem;
-  font: inherit;
-  font-size: 0.95em;
-}
+/* The 3D experience. */
 
-/* ------------------------------------------------------------------ payoff */
-
-.payoff {
-  margin: 2rem 0 0;
-  padding-left: 0.9rem;
-  border-left: 2px solid var(--accent);
-  max-width: 42ch;
-  text-wrap: pretty;
-}
-
-/* ------------------------------------------------------------------- about */
-
-.about {
-  max-width: 40rem;
-  padding: 0 var(--pad) clamp(3rem, 8vh, 6rem);
-  margin-top: clamp(2.5rem, 8vh, 5rem);
-}
-
-.about h2 {
-  margin: 0 0 0.9rem;
-  padding-top: 1.4rem;
-  border-top: 1px solid var(--line);
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--ink-dim);
-}
-
-.about ul {
-  margin: 0;
-  padding-left: 1.1rem;
-  color: var(--ink-faint);
-  font-size: 0.85rem;
-}
-
-.about li + li {
-  margin-top: 0.55rem;
-}
-
-.about strong {
-  color: var(--ink-dim);
-  font-weight: 600;
-}
-
-/* ----------------------------------------------------- once script arrives */
-
-[data-js="on"] .hero {
-  position: relative;
-  height: 100svh;
-  padding: 0;
+[data-js="on"] body {
   overflow: hidden;
+}
+
+[data-js="on"] .experience {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-
-  /* title / drawing / readout / payoff / control. The payoff gets a row of its
-     own rather than sharing the readout's: stacked in one cell, the two printed
-     on top of each other. Rows 4 collapses to nothing until there is a payoff
-     to put in it. */
-  grid-template-rows: auto minmax(0, 1fr) auto auto auto;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  width: 100%;
+  height: 100dvh;
+  padding: 0;
+  overflow: hidden;
+  isolation: isolate;
 }
 
-/* The drawing spans the whole screen and everything else sits on top of it.
-   The renderer measures these overlays and keeps the field clear of them, so
-   the words are never over the dots. */
-[data-js="on"] .stage-frame {
-  grid-area: 1 / 1 / 6 / 2;
-  height: auto;
-  margin: 0;
+[data-js="on"] .experience::after {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  content: "";
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.7'/%3E%3C/svg%3E");
 }
 
 [data-js="on"] .masthead {
   grid-area: 1 / 1 / 2 / 2;
-  z-index: 2;
+  z-index: 3;
   padding: var(--pad) var(--pad) 0;
 }
 
-[data-js="on"] .readout {
-  grid-area: 3 / 1 / 4 / 2;
-  z-index: 2;
-  align-self: end;
-  padding: 0 var(--pad);
+[data-js="on"] .stage {
+  display: contents;
 }
 
-[data-js="on"] .dock {
-  grid-area: 5 / 1 / 6 / 2;
-  z-index: 2;
-  width: min(100%, 34rem);
+[data-js="on"] .stage-frame {
+  grid-area: 1 / 1 / 4 / 2;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
   margin: 0;
-  padding: 1.1rem var(--pad) var(--pad);
+  background:
+    radial-gradient(circle at 64% 43%, #181a1f 0, #0c0e11 38%, var(--bg) 76%);
 }
 
-/* Motion on the container, never on the digits: the numeral itself is swapped
-   whole, never counted up. Going from display:none to shown restarts this. */
+[data-js="on"] .stage-frame::after {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  content: "";
+  background:
+    radial-gradient(circle at 50% 48%, transparent 32%, rgb(0 0 0 / 32%) 100%),
+    linear-gradient(to bottom, rgb(7 8 10 / 38%), transparent 22% 73%, rgb(7 8 10 / 58%));
+}
+
+[data-js="on"] .scene-status {
+  position: absolute;
+  top: var(--pad);
+  right: var(--pad);
+  z-index: 3;
+}
+
+[data-js="on"] .readout {
+  position: absolute;
+  bottom: clamp(7.2rem, 15dvh, 10rem);
+  left: var(--pad);
+  z-index: 3;
+  max-width: min(34rem, calc(100% - var(--pad) * 2));
+  pointer-events: none;
+}
+
+[data-js="on"] .magnitudes {
+  margin: 0;
+}
+
 [data-js="on"] .magnitude {
-  animation: land 460ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: readout-in 500ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-[data-js="on"] .magnitude + .magnitude {
-  margin-top: 0;
-  padding-top: 0;
-  border-top: 0;
+[data-js="on"] .magnitude:not([data-active]) {
+  display: none;
 }
 
-@keyframes land {
-  from {
-    opacity: 0;
-    transform: translateY(0.7rem);
-    filter: blur(5px);
-  }
+[data-js="on"] .magnitude-numeral {
+  font-size: clamp(3.5rem, 9vw, 8.5rem);
+  text-shadow: 0 0 2rem rgb(7 8 10 / 80%);
 }
 
-/* The payoff is the one thing this page withholds, and it may only be withheld
-   once script has announced itself. Without script it is simply visible. */
+[data-js="on"] .magnitude-note {
+  min-height: 1.5em;
+}
+
+[data-js="on"] .magnitude-counting,
+[data-js="on"] .readout-measure {
+  min-height: 1em;
+}
+
 [data-js="on"] .payoff {
   display: none;
 }
 
-/* Beside the drawing, not over it. As a floating panel it covered the very
-   thing the sentence is about. */
 [data-js="on"][data-at-end] .payoff {
+  position: absolute;
+  bottom: clamp(7.2rem, 15dvh, 10rem);
+  left: var(--pad);
+  z-index: 3;
   display: block;
-  grid-area: 4 / 1 / 5 / 2;
-  z-index: 2;
-  align-self: end;
-  max-width: 32ch;
-  margin: 0;
-  padding: 0 var(--pad) 0.9rem;
-  border: 0;
-  box-shadow: inset 2px 0 0 var(--accent);
-  animation: arrive 800ms 500ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  margin-bottom: -4.8rem;
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+  animation: payoff-in 650ms 500ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-@keyframes arrive {
+[data-js="on"] .dock {
+  grid-area: 3 / 1 / 4 / 2;
+  z-index: 3;
+  align-self: end;
+  width: min(34rem, calc(100% - var(--pad) * 2));
+  margin: 0 var(--pad) var(--pad) auto;
+  padding: 0.85rem 1rem 0.75rem;
+  border: 1px solid rgb(244 241 234 / 10%);
+  border-radius: 0.45rem;
+  background: rgb(10 11 14 / 58%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 5%),
+    0 1rem 4rem rgb(0 0 0 / 24%);
+  backdrop-filter: blur(18px) saturate(120%);
+}
+
+@keyframes readout-in {
   from {
     opacity: 0;
-    transform: translateY(1rem);
+    filter: blur(7px);
+    transform: translateY(0.8rem);
   }
 }
 
-/* ------------------------------------------------------------ wide screens */
-
-@media (width >= 60rem) {
-  /* Text down the left, drawing in the rest, control at the bottom of the
-     drawing's column. A bottom band instead would letterbox the field on a
-     1920x1080 screen and waste the dimension the field most wants. */
-  [data-js="on"] .hero {
-    grid-template-columns: minmax(0, 20rem) minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr) auto auto;
+@keyframes payoff-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
   }
+}
 
-  [data-js="on"] .stage-frame {
-    grid-area: 1 / 1 / 5 / 3;
-  }
-
-  [data-js="on"] .masthead {
-    grid-area: 1 / 1 / 2 / 3;
-  }
-
-  /* Readout at the foot of the flexible row, payoff in its own row beneath it,
-     control at the bottom of the drawing's column. */
+@media (width >= 58rem) {
   [data-js="on"] .readout {
-    grid-area: 2 / 1 / 3 / 2;
-    align-self: end;
-    padding-bottom: 1.4rem;
-  }
-
-  [data-js="on"][data-at-end] .payoff {
-    grid-area: 3 / 1 / 4 / 2;
-    padding-bottom: 0;
+    bottom: 12vh;
+    width: 26rem;
   }
 
   [data-js="on"] .dock {
-    grid-area: 3 / 2 / 5 / 3;
-    align-self: end;
-    padding-left: 0;
+    margin-left: auto;
+  }
+
+  [data-js="on"][data-at-end] .payoff {
+    bottom: 12vh;
+  }
+}
+
+@media (width < 40rem) {
+  :root {
+    --pad: clamp(1rem, 5vw, 1.35rem);
+  }
+
+  [data-js="on"] .scene-status-shape {
+    display: none;
+  }
+
+  [data-js="on"] .readout {
+    bottom: 9.15rem;
+  }
+
+  [data-js="on"] .magnitude-numeral {
+    font-size: clamp(3rem, 15vw, 5rem);
+  }
+
+  [data-js="on"][data-step="6"] .magnitude-numeral {
+    font-size: clamp(2.6rem, 12vw, 3.45rem);
+    letter-spacing: -0.085em;
+  }
+
+  [data-js="on"] .magnitude-name {
+    display: none;
+  }
+
+  [data-js="on"] .magnitude-note {
+    max-width: 27ch;
+    margin-top: 0.55rem;
+    font-size: 0.86rem;
+  }
+
+  [data-js="on"] .magnitude-counting,
+  [data-js="on"] .readout-measure {
+    font-size: 0.59rem;
+  }
+
+  [data-js="on"][data-at-end] .payoff {
+    bottom: 9.15rem;
+    margin-bottom: -4.6rem;
+    font-size: 0.7rem;
+  }
+
+  [data-js="on"] .dock {
+    width: calc(100% - var(--pad) * 2);
+    margin: 0 var(--pad) var(--pad);
+  }
+
+  .dock-hint {
+    max-width: 15rem;
   }
 }
 
@@ -493,6 +519,7 @@ kbd {
   *,
   *::before,
   *::after {
+    scroll-behavior: auto !important;
     animation-duration: 0.01ms !important;
     animation-delay: 0s !important;
     animation-iteration-count: 1 !important;

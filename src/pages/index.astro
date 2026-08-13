@@ -4,23 +4,14 @@ import { MAGNITUDES } from "../lib/magnitudes";
 ---
 
 <Layout
-  title="How big is a million? — an interactive explainer"
-  description="One dot is one. Multiply it by ten, seven times. The dot never changes size — only how far back you are standing."
+  title="How big is a million?"
+  description="Move through seven powers of ten: point, line, plane, volume, and finally one million points."
 >
   <a class="skip" href="#scale">Skip to the scale</a>
 
-  {/*
-    One screen. The drawing is the page; everything else is four short lines and
-    a control, laid over it. Without script this whole thing is a plain
-    document: the frame keeps a modest height, and the readout below it is a
-    readable list of all seven magnitudes rather than an empty box.
-  */}
-  <div class="hero">
-    <header class="masthead" data-overlay>
+  <main class="experience">
+    <header class="masthead">
       <h1>How big is a million?</h1>
-      <nav aria-label="Primary">
-        <a href="#about">Notes</a>
-      </nav>
     </header>
 
     <figure class="stage" data-core-output>
@@ -30,15 +21,24 @@ import { MAGNITUDES } from "../lib/magnitudes";
           data-canvas
           role="img"
           aria-label={MAGNITUDES[0].aria}></canvas>
+        <p class="render-fallback" data-render-fallback hidden>
+          This browser cannot draw the 3D field. The seven magnitudes are still
+          listed below.
+        </p>
         <noscript>
-          <p class="stage-noscript">
-            The drawing needs JavaScript. Every magnitude it would have drawn is
-            written out below.
+          <p class="render-fallback">
+            Turn on JavaScript to move through the 3D field. The full sequence
+            is listed below.
           </p>
         </noscript>
       </div>
 
-      <figcaption class="readout" data-overlay>
+      <div class="scene-status" aria-hidden="true">
+        <span data-step-label>01 / 07</span>
+        <span class="scene-status-shape" data-shape-label>point</span>
+      </div>
+
+      <figcaption class="readout">
         <ol class="magnitudes" aria-live="polite">
           {
             MAGNITUDES.map((magnitude) => (
@@ -49,7 +49,7 @@ import { MAGNITUDES } from "../lib/magnitudes";
                 </p>
                 <p class="magnitude-note">{magnitude.note}</p>
                 <p class="magnitude-counting">
-                  {magnitude.counting} to count aloud
+                  Counting aloud: {magnitude.counting}
                 </p>
               </li>
             ))
@@ -57,18 +57,13 @@ import { MAGNITUDES } from "../lib/magnitudes";
         </ol>
         <p class="readout-measure" data-measure></p>
       </figcaption>
+
+      <p class="payoff" data-payoff>
+        Easy to say. More than eleven days to count.
+      </p>
     </figure>
 
-    <div class="dock" id="scale" data-overlay>
-      {/*
-        The slider is first in the DOM, and laid out first, so DOM order, visual
-        order and tab order all agree. Being first matters: it steps natively on
-        the arrow keys from step 0, so the keyboard is served by a real control
-        rather than by handlers of mine — and check:render, which focuses the
-        first [data-core-interaction] and sends real key events, exercises that
-        same path. A disabled "back" button first would sit at the start of the
-        scale doing nothing, and the sensor would report a break that isn't one.
-      */}
+    <nav class="dock" id="scale" aria-label="Powers of ten">
       <label class="sr-only" for="magnitude-scale">Magnitude</label>
       <input
         id="magnitude-scale"
@@ -91,19 +86,16 @@ import { MAGNITUDES } from "../lib/magnitudes";
           ))
         }
       </datalist>
-      <ul class="dock-marks" aria-hidden="true">
-        <li>1</li>
-        <li>10</li>
-        <li>100</li>
-        <li>1K</li>
-        <li>10K</li>
-        <li>100K</li>
-        <li>1M</li>
-      </ul>
+
+      <div class="dock-scale" aria-hidden="true">
+        <span>1</span>
+        <i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+        <span>1M</span>
+      </div>
 
       <div class="dock-row">
         <p class="dock-hint" id="dock-hint">
-          Drag, or press <kbd>←</kbd> <kbd>→</kbd> anywhere
+          Drag the scale or use <kbd>←</kbd> <kbd>→</kbd>
         </p>
         <div class="dock-nudges">
           <button
@@ -127,39 +119,8 @@ import { MAGNITUDES } from "../lib/magnitudes";
           </button>
         </div>
       </div>
-    </div>
-
-    <p class="payoff" data-payoff>
-      Every dot is the one you started with, at the same size. You have looked at
-      all of them. You just cannot find the first one any more.
-    </p>
-  </div>
-
-  <section class="about" id="about">
-    <h2>About these numbers</h2>
-    <ul>
-      <li>
-        No dataset — only the powers of ten. The drawing holds exactly as many
-        dots as the number says.
-      </li>
-      <li>
-        <strong>Counting time</strong> is arithmetic on the magnitude: one number
-        per second, no pauses and no sleep.
-      </li>
-      <li>
-        <strong>The size of one dot</strong> is measured from the drawing on your
-        screen, at your window size. Resize and it changes, because it is a
-        measurement rather than a claim.
-      </li>
-      <li>
-        Past a certain zoom one dot is smaller than one pixel, so each block is
-        filled at exactly the fraction of its area the dots cover — the same
-        average brightness they would have made. That the screen runs out before
-        the number does is the point, so faking it would be strange.
-      </li>
-      <li>Built for COMP4020 at the ANU.</li>
-    </ul>
-  </section>
+    </nav>
+  </main>
 
   <script>
     import { start } from "../scripts/explainer";
