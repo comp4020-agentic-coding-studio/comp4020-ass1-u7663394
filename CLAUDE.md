@@ -274,12 +274,53 @@ Three things this cost, which are worth remembering when reading any sensor:
   The first run of that found a real bug: turning on reduced motion mid-zoom
   only repainted, leaving the drawing parked between two magnitudes under a
   number it did not match.
+- **A canvas is opaque to every DOM sensor.** Squeezing the field off the side
+  of a phone left the stage blank while the markup check, the interaction check,
+  the overflow check and the exception listener all stayed green. `check:render`
+  now samples the canvas and reports the fraction of pixels differing from the
+  corner — "there is a picture here", without knowing what the picture is. If a
+  sensor suite can't see the main artefact, it isn't measuring the artefact.
 - **Falsify a new check before trusting it.** Every sensor added this week was
   run against a deliberately planted fault first — `tabindex="-1"` on a control,
   a 700px div, a throwing script, an ungated `display: none`, a foreign server
   squatting on the port. A check that has never been seen to go red is a
   decoration. This is the same lesson as the overflow threshold below, one step
   earlier: don't just ask whether the check *can* fail in principle, watch it.
+
+## Two loops that will not settle
+
+Both are the same mistake as the overflow threshold above, one level out: a
+quantity derived from a thing must not also determine that thing.
+
+- **A layout must not depend on a figure measured from the layout.** The
+  on-screen size of one dot is read off the render; the render is fitted to
+  whatever space the readout leaves; on a phone the readout runs along the
+  bottom edge. So letting the figure's own line-wrapping change the readout's
+  height closed the circle, and the page reflowed forever — with a
+  `ResizeObserver` on the overlays, this hung a whole `check:render` run rather
+  than looking wrong. Text that a measurement writes into **reserves its
+  height**, and the resize handler returns early unless something actually
+  moved.
+- **A geometric heuristic has to be about the quantity you need, not a proxy
+  for it.** Overlays clip one edge of the drawing's safe box each, and the first
+  version chose the edge the overlay sat *nearest*. A full-width bar along the
+  bottom of a phone is flush with the left edge too, so it cut the left off the
+  whole frame and the field vanished into a 64px sliver off-screen. Choosing by
+  the *area* the cut costs is correct because area is what the drawing needs.
+
+## Motion: the step is the explanation
+
+- **Two beats, camera first.** Pull the camera back, *then* let the copies
+  arrive. Both on one eased value reads as a dissolve between two pictures; the
+  copies moving first would put the beat outside the frame.
+- **An arrival may translate; it may never scale.** A copy that grew into place
+  would render dots at a size they never have, which is the page contradicting
+  its own argument. `easeOutBack` is safe on a translation for the same reason.
+- **Watch the transition before believing it.** Every still frame of a broken
+  transition looks like a plausible drawing, and `pnpm shots` only photographs
+  settled states. Capturing frames at fixed offsets mid-step is how the two
+  beats were checked; `src/lib/motion.test.ts` holds the ends and the order so
+  a settled magnitude can never differ from the last frame of the step into it.
 
 ## The core interaction is marked in the markup
 

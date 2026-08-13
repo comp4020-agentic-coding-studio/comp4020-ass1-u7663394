@@ -25,6 +25,12 @@ preview server started ten hours earlier — it answered, so I believed it. My
 had still been fooled, because the old rule only asked whether the server was
 *alive*. The new one asks whether it is serving my build, byte for byte.
 
+Later, a layout change squeezed the drawing off the side of a phone and left the
+stage blank while every check stayed green — a canvas is opaque to all of them. I
+had to open the screenshots to notice, and looking is not a sensor.
+
 I want to be the kind of developer who is suspicious of green. Not of failure —
 failure announces itself — but of a check that has never been watched going red.
-Every sensor I added this week, I broke on purpose first.
+Every sensor I added this week, I broke on purpose first, and the ones that
+mattered most were the ones covering the part of the artefact nothing else could
+see.
