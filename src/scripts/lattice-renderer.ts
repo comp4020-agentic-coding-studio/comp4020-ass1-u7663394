@@ -1,5 +1,5 @@
 import { cameraProgress } from "../lib/motion";
-import type { InspectionPose } from "../lib/inspection";
+import { inspectionProfile, type InspectionPose } from "../lib/inspection";
 import { DOT_RADIUS, LATTICES, type Axis, type Lattice, type Vec3 } from "../lib/layout";
 
 const FOV = Math.PI / 4.2;
@@ -437,28 +437,30 @@ export function createLatticeRenderer(canvas: HTMLCanvasElement): LatticeRendere
       const settled = progress >= 1;
       const sampling = !settled && to.count > ANIMATED_POINT_BUDGET;
       const dense = to.step >= 5;
-      const inspecting = settled && to.step >= 5 && inspection.amount > 0.001;
+      const inspectingMillion =
+        settled && to.count === 1_000_000 && inspection.amount > 0.001;
       const aspect = width / height;
       const fromDistance = fitDistance(from, aspect);
       const toDistance = fitDistance(to, aspect);
 
-      const inspectYaw = to.step === 5 ? -0.1 : 0.16;
-      const inspectPitch = to.step === 5 ? -0.09 : 0.08;
-      const inspectZoom = to.step === 5 ? 0.54 : 0.48;
+      const inspect = inspectionProfile(to.step);
       const inspectionAmount = settled ? inspection.amount : 0;
       const yaw =
         lerp(from.camera.yaw, to.camera.yaw, camera) +
         parallax.yaw +
-        inspectionAmount * inspectYaw +
-        inspection.drift * 0.035;
+        inspectionAmount * (inspect?.yaw ?? 0) +
+        inspection.drift * (inspect?.orbitYaw ?? 0);
       const pitch =
         lerp(from.camera.pitch, to.camera.pitch, camera) +
         parallax.pitch +
-        inspectionAmount * inspectPitch -
-        inspection.drift * 0.025;
+        inspectionAmount * (inspect?.pitch ?? 0) -
+        inspection.drift * (inspect?.orbitPitch ?? 0);
       const baseDistance = Math.exp(
         lerp(Math.log(fromDistance), Math.log(toDistance), camera),
       );
+      const inspectZoom = aspect < 0.75
+        ? (inspect?.phoneZoom ?? inspect?.zoom ?? 1)
+        : (inspect?.zoom ?? 1);
       const distance = baseDistance * lerp(1, inspectZoom, inspectionAmount);
 
       if (dense) {
@@ -503,8 +505,9 @@ export function createLatticeRenderer(canvas: HTMLCanvasElement): LatticeRendere
       gl.uniform1f(uniforms.dpr, dpr);
       gl.uniform2f(
         uniforms.offset,
-        (aspect > 1.2 ? 0.13 : 0) - inspectionAmount * (aspect > 1.2 ? 0.055 : 0.015),
-        (aspect < 0.75 ? 0.08 : 0) + inspection.drift * 0.025,
+        (aspect > 1.2 ? 0.13 : 0) -
+          inspectionAmount * (aspect > 1.2 ? (inspect?.desktopPan ?? 0) : (inspect?.phonePan ?? 0)),
+        (aspect < 0.75 ? 0.08 : 0) + inspection.drift * (inspect?.orbitY ?? 0),
       );
       gl.uniform1i(uniforms.toCount, to.count);
       // The 10,000-point state uses the original luminous treatment. Fade the
@@ -516,7 +519,7 @@ export function createLatticeRenderer(canvas: HTMLCanvasElement): LatticeRendere
       const density = Math.exp(
         lerp(Math.log(densityFor(from.count)), Math.log(densityFor(to.count)), camera),
       );
-      if (inspecting && to.count === 1_000_000) {
+      if (inspectingMillion) {
         gl.uniform1i(uniforms.drawMode, 3);
         gl.uniform1i(uniforms.indexStride, 1);
         // The point size remains invariant; only the moving inspection sample

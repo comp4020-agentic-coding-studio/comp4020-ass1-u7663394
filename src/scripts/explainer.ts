@@ -201,15 +201,14 @@ export function start(): void {
     }
   });
 
-  // A few degrees of mouse parallax make the plane and volume readable as
-  // space before the next transition. It never changes the data, and vanishes
-  // under reduced motion or on touch.
+  // A few degrees of mouse parallax help the point and line read as space. From
+  // the plane onward the deliberate inspection path owns the camera instead.
   frame.addEventListener("pointermove", (event) => {
     if (
       reduceMotion.matches ||
       event.pointerType !== "mouse" ||
       frameId !== 0 ||
-      target >= 5
+      target >= INSPECTION_START_STEP
     ) {
       return;
     }

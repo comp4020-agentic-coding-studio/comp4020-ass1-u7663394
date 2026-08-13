@@ -107,7 +107,7 @@ export const MAGNITUDES: readonly Magnitude[] = NAMES.map((name, step) => {
     shape: SHAPES[step],
     counting: countingTime(value),
     aria:
-      step >= 5
+      step >= 2
         ? `${NUMBER.format(value)} dots arranged in 1,000-point volumes. ` +
           `The camera alternates between a complete overview and a close inspection.`
         : `${NUMBER.format(value)} dots, drawn at the same size as the first one, ` +

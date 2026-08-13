@@ -760,11 +760,11 @@ try {
 
         if (inspectionShots) {
           // Settled shots deliberately use reduced motion, so they can only
-          // prove the overview. Revisit the two dense states with motion on and
-          // wait until their slow camera path reaches the close inspection
+          // prove the overview. Revisit every travelling state with motion on
+          // and wait until its camera path reaches the close inspection
           // hold. These are review artefacts rather than interaction tests;
           // trusted keyboard operation is already asserted above.
-          for (const index of [5, 6]) {
+          for (const index of [2, 3, 4, 5, 6]) {
             await client.send("Page.navigate", { url }, sessionId);
             await sleep(650);
             await evaluate(
@@ -777,9 +777,9 @@ try {
                 return "0";
               })()`,
             );
-            // A six-step jump is capped at 2.6s; the overview then holds for
-            // 0.5s and approaches for 5.2s. Ten seconds reaches the close hold.
-            await sleep(10_000);
+            // Any multi-step jump is at most 2.6s. A further 5.9s lands inside
+            // the close hold for every geometry-specific profile.
+            await sleep(8_500);
             const { data } = await client.send(
               "Page.captureScreenshot",
               { format: "png", captureBeyondViewport: true },

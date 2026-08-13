@@ -113,18 +113,18 @@ describe("the moving frame budget", () => {
 });
 
 describe("dense volume hierarchy", () => {
-  it("gives 100,000 more interior ink without overpowering its faces", () => {
-    expect(DENSE_100K_INTERIOR_WEIGHT).toBeGreaterThan(DENSE_MILLION_INTERIOR_WEIGHT);
-    expect(DENSE_100K_INTERIOR_WEIGHT).toBeGreaterThanOrEqual(0.4);
-    expect(DENSE_FACE_WEIGHT).toBeGreaterThan(DENSE_100K_INTERIOR_WEIGHT);
-    expect(DENSE_EDGE_WEIGHT).toBeGreaterThan(DENSE_FACE_WEIGHT);
+  it("keeps internal spheres prominent while edges retain the hierarchy", () => {
+    expect(DENSE_100K_INTERIOR_WEIGHT).toBe(0.75);
+    expect(DENSE_MILLION_INTERIOR_WEIGHT).toBe(0.75);
+    expect(DENSE_FACE_WEIGHT).toBe(0.6);
+    expect(DENSE_EDGE_WEIGHT).toBeGreaterThan(DENSE_100K_INTERIOR_WEIGHT);
     expect(DENSE_EDGE_WEIGHT).toBeLessThanOrEqual(1);
   });
 
-  it("keeps the million treatment unchanged and eases into it", () => {
+  it("keeps the accepted dense treatment stable through the last transition", () => {
     expect(denseInteriorWeight(5, 5, 1)).toBe(DENSE_100K_INTERIOR_WEIGHT);
     expect(denseInteriorWeight(5, 6, 0)).toBe(DENSE_100K_INTERIOR_WEIGHT);
-    expect(denseInteriorWeight(5, 6, 0.5)).toBeCloseTo(0.37);
+    expect(denseInteriorWeight(5, 6, 0.5)).toBe(0.75);
     expect(denseInteriorWeight(5, 6, 1)).toBe(DENSE_MILLION_INTERIOR_WEIGHT);
     expect(denseInteriorWeight(6, 6, 1)).toBe(DENSE_MILLION_INTERIOR_WEIGHT);
   });
