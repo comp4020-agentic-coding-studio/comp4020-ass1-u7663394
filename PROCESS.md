@@ -1,83 +1,75 @@
 # Process overview
 
-<!-- TEMPLATE: this file is a shape to fill in, not a form. Replace everything
-     in it with your own overview, and delete this comment — `pnpm
-     check:evidence` will remind you if it's still here. -->
-
-A reading-guide to how the work came together --- a map to your process, not an
-essay about it. Markers read this file and follow its citations; they don't
-trawl the repo for evidence you didn't point at, so if a moment mattered, cite
-it.
-
-This file is the shape; the course site's
-[assessment page](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/topics/assessment/#what-you-submit)
-is the requirement, and each brief adds its own word count and moment count.
-
 ## What I built
 
-One paragraph: the thing, and the idea behind it.
+**How big is a million?** — one dot is one, and the visitor multiplies it by ten
+seven times, to 1,000,000. The rule the page never breaks is the argument: the
+dot never changes size, only the camera moves back. So each step is ten copies
+of what you were just looking at, not a bigger number in a bigger font. By the
+end the first dot is still there, marked, and too small to see. The whole idea
+lives in one invariant, so most of my effort went into building sensors that
+could catch it breaking.
 
 ## The moments that mattered
 
-Three or four for an assignment; fewer is fine for a weekly prototype. Keep the
-list short so each moment has room to do all four jobs:
+### The screenshots I was looking at were of a state nobody designed
 
-1. **what happened** --- the problem, or the thing the agent got wrong
-2. **what you did instead of the obvious thing** --- the call you made, and why
-   it beat the obvious one
-3. **how you knew it was right** --- the check you ran, the viewport you looked
-   at, what you read before accepting the diff
-4. **the citation** --- a commit or commit range, a `CLAUDE.md` change, a check
-   that went from red to green, a prompt paired with the commit it produced
+`pnpm shots` took one image per page. For a seven-state explainer that is a
+photograph of the landing state and nothing else, so the two magnitudes where
+the layout actually gets hard were never in the folder I was reviewing. The
+obvious fix was to add a `?step=` query parameter and shoot each URL; that would
+have put a feature in the artefact to serve the harness. Instead I taught the
+sensor to walk the control it already knew about — if the marked control is a
+range, drive it with trusted key events and shoot every value — so the page
+gains nothing and the coverage is generic. The first run paid for itself: at
+step 2 the drawing was parked between two magnitudes under a caption that said
+`100`. Turning on reduced motion mid-zoom only repainted instead of ending the
+zoom. I reproduced it by hand before touching anything, then fixed it
+([`e834c21`](https://github.com/comp4020-agentic-coding-studio/comp4020-ass1-u7663394/commit/e834c21)).
 
-Jobs 2 and 3 are the ones the repo can't tell a reader on its own, so they're
-where the marks are. The strongest moments are the ones where a correction
-landed in the **harness** rather than in another prompt --- a rule added to
-`CLAUDE.md`, a check wired up, an attempt thrown away: re-prompting until it
-passes is the routine case, and changing what the agent works against is the
-skilled one.
+### A check that argues with correct output gets worked around
 
-Cite each moment as a link whose text is the commit hash or range and whose
-target is this repo's commit or compare URL, so a reader clicks straight to the
-evidence:
+My carried-forward rule banned root-absolute URLs outright, and it went red on
+Astro's own stylesheet — emitted as `/comp4020-ass1-u7663394/_astro/…`, already
+carrying the base, and correct on the deployed URL. Two easy exits: delete the
+test, or special-case `_astro`. Both leave the rule lying. I restated it as what
+actually breaks — a root-absolute URL is an error *unless it carries the deploy
+base* — and read the base from `astro.config.ts` rather than writing the path
+down twice
+([`e834c21`](https://github.com/comp4020-agentic-coding-studio/comp4020-ass1-u7663394/commit/e834c21)).
+I knew it was right because it stayed red against a planted bare `/about/` and
+green against the framework's output.
 
-- one commit: [`a1b2c3d`](https://github.com/YOUR-ORG/YOUR-REPO/commit/a1b2c3d)
-- a range:
-  [`a1b2c3d...e4f5a6b`](https://github.com/YOUR-ORG/YOUR-REPO/compare/a1b2c3d...e4f5a6b)
+### The sensor was measuring a server it did not own
 
-To pair a prompt with the commit it produced, quote the prompt (curated, not a
-full transcript) next to the citation:
+A throwaway benchmark could not get a preview server on a free port.
+`astro preview status` explained why: a daemon with 35,095 seconds of uptime.
+`astro preview` survives `subprocess.kill()`, and a second one prints "already
+running" and exits 0 — so every `check:render` run that day had measured a
+server started ten hours before the code it was checking, and reported success.
+`CLAUDE.md` already carried "a sensor pointed at the wrong server measures
+nothing"; the fix it recorded, *start your own server*, turned out to be
+necessary and not sufficient. So the new rule is stronger than the old one:
+check identity, not liveness. The run now stops any daemon at both ends and
+compares the bytes the server returns against `dist/index.html`
+([`cdbc3a4`](https://github.com/comp4020-agentic-coding-studio/comp4020-ass1-u7663394/commit/cdbc3a4)).
+Verified by parking a foreign static server on the port: it now stops with "is
+not serving this build" instead of measuring it.
 
-> the prompt, verbatim
+### Refusing the obvious animation, in a test rather than in my head
 
-Screenshots are welcome where one carries the verification better than a
-sentence does. Commit the file to this repo and link it with a **relative**
-path, which is what makes it render on GitHub: `![alt text](docs/before.png)`.
-Images don't count towards the word count and don't replace the citation.
+The stock move for a page about big numbers is a count-up. `CLAUDE.md` forbids
+it — a count-up once left `396` on screen where the source said `687` — but a
+prohibition I only remember is one I will drift from at 1am. I encoded it:
+figures switch discretely, and the measured dot size is written only after the
+tween ends, asserted in `spec/explainer.test.ts`. The same commit holds the
+invariance the idea rests on — the unit never scales, every block holds exactly
+ten of the last, child 0 stays at the origin — and I falsified the reveal-gating
+check with an ungated `display: none` before trusting any of it
+([`928a444`](https://github.com/comp4020-agentic-coding-studio/comp4020-ass1-u7663394/commit/928a444),
+[`af2d3f7`](https://github.com/comp4020-agentic-coding-studio/comp4020-ass1-u7663394/commit/af2d3f7)).
 
-### A worked moment, for shape
+## Where to look
 
-Delete this section along with the rest of the boilerplate --- it's here to show
-the four jobs in one paragraph, not to be imitated in content.
-
-> The date formatter kept coming back with `toLocaleDateString()` and no locale
-> argument, so the same build rendered differently on my machine and in CI. I'd
-> already re-prompted it twice, which fixed the line but not the habit, so the
-> third time I put the rule in `CLAUDE.md` instead
-> ([`3f9ac21`](https://github.com/YOUR-ORG/YOUR-REPO/commit/3f9ac21)) and added
-> a spec test that fails on a bare `toLocaleDateString`. That's what told me it
-> had actually taken: the test went red against the old code and green against
-> the new, and the next two features it wrote passed it without prompting
-> ([`3f9ac21...b7e0d14`](https://github.com/YOUR-ORG/YOUR-REPO/compare/3f9ac21...b7e0d14)).
-
-## Before you ship
-
-`pnpm check:evidence` verifies your citations resolve to real commits, that the
-current reflection entry is in `reflections/`, and that your `CLAUDE.md` is
-there --- before a marker ever opens the file. It checks that your map is
-traceable, not that it is good: the marker judges whether your small,
-deliberately chosen set of moments shows real judgement and reflection. A green
-check is not a substitute for that curation.
-
-Images are deliberately not checked, because whether one renders is visible the
-moment you look. Open this file on GitHub and look at it before you ship.
+`PLAN.md` is what I wrote before any code, and reads honestly against the
+result. `CLAUDE.md`'s two new sensor rules are the durable part.
